@@ -1,5 +1,6 @@
 import contextlib
 import math
+from functools import partial
 
 import gymnasium as gym
 import numpy as np
@@ -252,10 +253,12 @@ def test_shape_of_get_sample(replay_buffer_cls, sampling_strategy, recurrent):
                 assert samples.advantages.shape == (*expected_shape,)
                 assert samples.returns.shape == (*expected_shape,)
 
-                def _assert_sample_shape(sample, zero_nenvs):
+                def _assert_sample_shape(expected_shape, sample, zero_nenvs):
                     assert sample.shape == (*expected_shape, *zero_nenvs.shape[1:])
 
-                ot.tree_map(_assert_sample_shape, samples.observations, zero_obs_nenvs, namespace=OT_NAMESPACE)
+                ot.tree_map(
+                    partial(_assert_sample_shape, expected_shape), samples.observations, zero_obs_nenvs, namespace=OT_NAMESPACE
+                )
 
                 if sampling_strategy == SamplingStrategy.SCRAMBLE:
                     assert tree_empty(samples.recurrent_states)

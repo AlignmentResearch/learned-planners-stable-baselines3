@@ -178,7 +178,7 @@ class BitFlippingEnv(Env):
             self.state[action > 0] = 1 - self.state[action > 0]
         else:
             self.state[action] = 1 - self.state[action]
-        obs = self._get_obs()
+        obs: Dict[str, np.ndarray] = self._get_obs()  # type: ignore[assignment]
         reward = float(self.compute_reward(obs["achieved_goal"], obs["desired_goal"], None).item())
         terminated = reward == 0
         self.current_step += 1

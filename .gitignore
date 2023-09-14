@@ -50,3 +50,14 @@ src
 MUJOCO_LOG.TXT
 
 **/junit
+
+# mypy
+**/.mypy_cache/
+**/.dmypy.json
+**/dmypy.json
+
+# Pyre type checker
+**/.pyre/
+# Pytype type checker
+**/.pytype
+**/.ruff_cache

@@ -16,8 +16,7 @@ from stable_baselines3.common.type_aliases import (
 )
 from stable_baselines3.common.utils import get_device, nbytes
 from stable_baselines3.common.vec_env import VecNormalize
-from stable_baselines3.common.vec_env.util import TensorObsType
-from tests.test_vec_stacked_obs import as_torch_dtype
+from stable_baselines3.common.vec_env.util import TensorObsType, as_torch_dtype
 
 try:
     # Check memory used by replay buffer when possible
@@ -333,7 +332,7 @@ class ReplayBuffer(BaseBuffer):
             batch_inds = th.randint(0, self.pos, size=(batch_size,))
         return self._get_samples(batch_inds, env=env)
 
-    def _get_samples(self, batch_inds: np.ndarray, env: Optional[VecNormalize] = None) -> ReplayBufferSamples:
+    def _get_samples(self, batch_inds: Union[slice, th.Tensor], env: Optional[VecNormalize] = None) -> ReplayBufferSamples:
         # Sample randomly the env idx
         env_indices = th.randint(0, high=self.n_envs, size=(len(batch_inds),), device=self.buffer_device)
 
@@ -538,7 +537,7 @@ class RolloutBuffer(BaseBuffer):
 
     def _get_samples(
         self,
-        batch_inds: np.ndarray,
+        batch_inds: Union[slice, th.Tensor],
         env: Optional[VecNormalize] = None,
     ) -> RolloutBufferSamples:  # type: ignore[signature-mismatch] #FIXME
         data = (

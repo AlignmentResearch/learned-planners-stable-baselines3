@@ -39,7 +39,7 @@ def _worker(
                 info["TimeLimit.truncated"] = truncated and not terminated
                 if done:
                     # save final observation where user can get it, then reset
-                    info["terminal_observation"] = obs_as_tensor(observation)
+                    info["terminal_observation"] = obs_as_tensor(observation, th.device("cpu"))
                     observation, reset_info = env.reset()
                 remote.send((observation, reward, done, info, reset_info))
             elif cmd == "reset":

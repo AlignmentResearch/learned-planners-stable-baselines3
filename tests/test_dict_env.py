@@ -122,7 +122,7 @@ def test_consistency(model_class):
     env = gym.wrappers.FlattenObservation(dict_env)
     dict_env.seed(10)
     obs, _ = dict_env.reset()
-    obs = obs_as_tensor(obs)
+    obs = obs_as_tensor(obs, device=None)
 
     kwargs = {}
     n_steps = 256

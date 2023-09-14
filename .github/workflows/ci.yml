@@ -3,11 +3,8 @@
 
 name: CI
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+# Disable Github Actions CI
+on: {}
 
 jobs:
   build:

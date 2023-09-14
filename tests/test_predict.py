@@ -79,7 +79,7 @@ def test_predict(model_class, env_id, device):
     vec_env = DummyVecEnv([lambda: gym.make(env_id), lambda: gym.make(env_id)])
 
     obs, _ = env.reset()
-    action, _ = model.predict(obs_as_tensor(obs))
+    action, _ = model.predict(obs_as_tensor(obs, vec_env.device))
     assert isinstance(action, th.Tensor)
     assert action.shape == env.action_space.shape
     assert env.action_space.contains(obs_as_np(action, env.action_space))
@@ -92,7 +92,7 @@ def test_predict(model_class, env_id, device):
     # Special case for DQN to check the epsilon greedy exploration
     if model_class == DQN:
         model.exploration_rate = 1.0
-        action, _ = model.predict(obs_as_tensor(obs), deterministic=False)
+        action, _ = model.predict(obs_as_tensor(obs, vec_env.device), deterministic=False)
         assert action.shape == env.action_space.shape
         assert env.action_space.contains(obs_as_np(action, env.action_space))
 

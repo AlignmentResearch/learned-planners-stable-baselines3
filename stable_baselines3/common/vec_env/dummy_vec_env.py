@@ -58,7 +58,7 @@ class DummyVecEnv(VecEnv):
             obs, reward, terminated, truncated, self.buf_infos[env_idx] = self.envs[env_idx].step(
                 obs_as_np(self.actions[env_idx], space=self.envs[env_idx].action_space)
             )
-            obs = obs_as_tensor(obs)
+            obs = obs_as_tensor(obs, self.device)
             self.buf_rews[env_idx] = float(reward)
             # convert to SB3 VecEnv api
             self.buf_dones[env_idx] = terminated or truncated
@@ -70,14 +70,14 @@ class DummyVecEnv(VecEnv):
                 # save final observation where user can get it, then reset
                 self.buf_infos[env_idx]["terminal_observation"] = obs
                 obs, self.reset_infos[env_idx] = self.envs[env_idx].reset()
-                obs = obs_as_tensor(obs)
+                obs = obs_as_tensor(obs, self.device)
             self._save_obs(env_idx, obs)
         return (self._obs_from_buf(), self.buf_rews.clone(), self.buf_dones.clone(), deepcopy(self.buf_infos))
 
     def reset(self) -> VecEnvObs:
         for env_idx in range(self.num_envs):
             obs, self.reset_infos[env_idx] = self.envs[env_idx].reset(seed=self._seeds[env_idx])
-            obs = obs_as_tensor(obs)
+            obs = obs_as_tensor(obs, self.device)
             self._save_obs(env_idx, obs)
         # Seeds are only used once
         self._reset_seeds()

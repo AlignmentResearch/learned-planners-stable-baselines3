@@ -2,7 +2,7 @@
 Helpers for dealing with vectorized environments.
 """
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, List, Optional, Tuple, TypeVar, Union, overload
 
 import numpy as np
 import torch as th
@@ -38,7 +38,26 @@ def as_numpy_dtype(dtype: Union[th.dtype, np.dtype]) -> np.dtype:
     return np.dtype(str(dtype).removeprefix("torch."))
 
 
-def obs_as_tensor(obs: Union[EnvObs, VecEnvObs], device: Optional[th.device] = None) -> VecEnvObs:
+@overload
+def obs_as_tensor(obs: Union[np.ndarray, th.Tensor], device: Optional[th.device]) -> th.Tensor:
+    ...
+
+
+@overload
+def obs_as_tensor(
+    obs: Union[Tuple[np.ndarray, ...], Tuple[th.Tensor, ...]], device: Optional[th.device]
+) -> Tuple[th.Tensor, ...]:
+    ...
+
+
+@overload
+def obs_as_tensor(
+    obs: Union[Dict[str, np.ndarray], Dict[str, th.Tensor]], device: Optional[th.device]
+) -> Dict[str, th.Tensor]:
+    ...
+
+
+def obs_as_tensor(obs, device):
     if isinstance(obs, dict):
         return {k: th.as_tensor(v, device=device) for k, v in obs.items()}
     elif isinstance(obs, tuple):

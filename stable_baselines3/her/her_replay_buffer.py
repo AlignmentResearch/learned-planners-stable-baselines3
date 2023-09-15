@@ -9,7 +9,10 @@ from gymnasium import spaces
 from stable_baselines3.common.buffers import DictReplayBuffer
 from stable_baselines3.common.type_aliases import DictReplayBufferSamples, TensorDict
 from stable_baselines3.common.vec_env import VecEnv, VecNormalize
-from stable_baselines3.her.goal_selection_strategy import KEY_TO_GOAL_STRATEGY, GoalSelectionStrategy
+from stable_baselines3.her.goal_selection_strategy import (
+    KEY_TO_GOAL_STRATEGY,
+    GoalSelectionStrategy,
+)
 
 
 class HerReplayBuffer(DictReplayBuffer):
@@ -245,6 +248,7 @@ class HerReplayBuffer(DictReplayBuffer):
             next_observations=next_observations,
             dones=dones,
             rewards=rewards,
+            recurrent_states=(),
         )
 
     def _get_real_samples(
@@ -282,6 +286,7 @@ class HerReplayBuffer(DictReplayBuffer):
                 self.dones[batch_indices, env_indices] * (1 - self.timeouts[batch_indices, env_indices])
             ).reshape(-1, 1),
             rewards=self.to_device(self._normalize_reward(self.rewards[batch_indices, env_indices].reshape(-1, 1), env)),
+            recurrent_states=(),
         )
 
     def _get_virtual_samples(
@@ -348,6 +353,7 @@ class HerReplayBuffer(DictReplayBuffer):
                 self.dones[batch_indices, env_indices] * (1 - self.timeouts[batch_indices, env_indices])
             ).reshape(-1, 1),
             rewards=self.to_device(self._normalize_reward(rewards.reshape(-1, 1), env)),
+            recurrent_states=(),
         )
 
     @staticmethod

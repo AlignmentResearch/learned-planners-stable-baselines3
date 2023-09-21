@@ -286,7 +286,7 @@ class RecurrentRolloutBuffer(RolloutBuffer):
             yield self._get_samples(slice(None), env_change)
             return
 
-        for start_idx in range(0, self.buffer_size, batch_size):
+        for start_idx in range(0, self.buffer_size * self.n_envs, batch_size):
             out = self._get_samples(slice(start_idx, start_idx + batch_size, None), env_change)
             assert len(out.observations) != 0
             yield out
@@ -298,12 +298,13 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         env: Optional[VecNormalize] = None,
     ) -> RecurrentRolloutBufferSamples:
         self.seq_start_indices, self.pad, self.pad_and_flatten = create_sequencers(
-            self.episode_starts[batch_inds], env_change[batch_inds], self.device
+            self.swap_and_flatten(self.episode_starts)[batch_inds], env_change[batch_inds], self.device
         )
 
         # Number of sequences
         n_seq = len(self.seq_start_indices)
-        max_length = self.pad(self.data.actions[batch_inds]).shape[1]
+        flat_actions = self.swap_and_flatten(self.data.actions)
+        max_length = self.pad(flat_actions[batch_inds]).shape[1]
         padded_batch_size = n_seq * max_length
         # We retrieve the lstm hidden states that will allow
         # to properly initialize the LSTM at the beginning of each sequence
@@ -320,13 +321,13 @@ class RecurrentRolloutBuffer(RolloutBuffer):
             # 1. (n_envs * n_steps, n_layers, dim) -> (batch_size, n_layers, dim)
             # 2. (batch_size, n_layers, dim)  -> (n_seq, n_layers, dim)
             # 3. (n_seq, n_layers, dim) -> (n_layers, n_seq, dim)
-            hidden_states_pi[batch_inds][self.seq_start_indices].swapaxes(0, 1),
-            cell_states_pi[batch_inds][self.seq_start_indices].swapaxes(0, 1),
+            self.swap_and_flatten(hidden_states_pi.swapaxes(1, 2))[batch_inds][self.seq_start_indices].swapaxes(0, 1),
+            self.swap_and_flatten(cell_states_pi.swapaxes(1, 2))[batch_inds][self.seq_start_indices].swapaxes(0, 1),
         )
         lstm_states_vf = (
             # (n_envs * n_steps, n_layers, dim) -> (n_layers, n_seq, dim)
-            hidden_states_vf[batch_inds][self.seq_start_indices].swapaxes(0, 1),
-            cell_states_vf[batch_inds][self.seq_start_indices].swapaxes(0, 1),
+            self.swap_and_flatten(hidden_states_vf.swapaxes(1, 2))[batch_inds][self.seq_start_indices].swapaxes(0, 1),
+            self.swap_and_flatten(cell_states_vf.swapaxes(1, 2))[batch_inds][self.seq_start_indices].swapaxes(0, 1),
         )
         lstm_states_pi = (self.to_device(lstm_states_pi[0]).contiguous(), self.to_device(lstm_states_pi[1]).contiguous())
         lstm_states_vf = (self.to_device(lstm_states_vf[0]).contiguous(), self.to_device(lstm_states_vf[1]).contiguous())
@@ -341,16 +342,30 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         #     returns=self.returns,
         #     hidden_states=self.data.hidden_states,
         # )
+        #
+        if isinstance(self.data.observations, dict):
+            observations = {}
+            for k, v in self.data.observations.items():
+                observations[k] = self.pad(self.swap_and_flatten(v)[batch_inds]).reshape(
+                    (padded_batch_size, *self.obs_shape[k])
+                )
+
+        else:
+            observations = self.pad(self.swap_and_flatten(self.data.observations)[batch_inds]).reshape(
+                (padded_batch_size, *self.obs_shape)
+            )
 
         samples = RecurrentRolloutBufferSamples(
             # (batch_size, obs_dim) -> (n_seq, max_length, obs_dim) -> (n_seq * max_length, obs_dim)
-            observations=self.pad(self.data.observations[batch_inds]).reshape((padded_batch_size, *self.obs_shape)),
-            actions=self.pad(self.data.actions[batch_inds]).reshape((padded_batch_size,) + self.data.actions.shape[1:]),
-            old_values=self.pad_and_flatten(self.data.values[batch_inds]),
-            old_log_prob=self.pad_and_flatten(self.data.log_probs[batch_inds]),
-            advantages=self.pad_and_flatten(self.advantages[batch_inds]),
-            returns=self.pad_and_flatten(self.returns[batch_inds]),
+            observations=observations,
+            actions=self.pad(self.swap_and_flatten(self.data.actions)[batch_inds]).reshape(
+                (padded_batch_size,) + flat_actions.shape[1:]
+            ),
+            old_values=self.pad_and_flatten(self.swap_and_flatten(self.data.values)[batch_inds]),
+            old_log_prob=self.pad_and_flatten(self.swap_and_flatten(self.data.log_probs)[batch_inds]),
+            advantages=self.pad_and_flatten(self.swap_and_flatten(self.advantages)[batch_inds]),
+            returns=self.pad_and_flatten(self.swap_and_flatten(self.returns)[batch_inds]),
             hidden_states=LSTMStates(lstm_states_pi, lstm_states_vf),
-            episode_starts=self.pad_and_flatten(self.data.episode_starts[batch_inds]),
+            episode_starts=self.pad_and_flatten(self.swap_and_flatten(self.data.episode_starts)[batch_inds]),
         )
         return ot.tree_map(lambda tens: self.to_device(tens), samples, namespace=NS)

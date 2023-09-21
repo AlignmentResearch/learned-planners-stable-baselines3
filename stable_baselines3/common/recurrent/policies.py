@@ -9,7 +9,7 @@ from stable_baselines3.common.distributions import Distribution
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.pytree_dataclass import OT_NAMESPACE as NS
 from stable_baselines3.common.pytree_dataclass import dataclass_frozen_pytree
-from stable_baselines3.common.recurrent.buffers import space_to_example
+from stable_baselines3.common.recurrent.buffers import LSTMStates, space_to_example
 from stable_baselines3.common.torch_layers import (
     BaseFeaturesExtractor,
     CombinedExtractor,
@@ -19,12 +19,6 @@ from stable_baselines3.common.torch_layers import (
 )
 from stable_baselines3.common.type_aliases import Schedule, TorchGymObs
 from stable_baselines3.common.utils import zip_strict
-
-
-@dataclass_frozen_pytree
-class LSTMStates:
-    pi: th.Tensor
-    vf: th.Tensor
 
 
 class RecurrentActorCriticPolicy(ActorCriticPolicy):
@@ -187,30 +181,38 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         :param lstm: LSTM object.
         :return: LSTM output and updated LSTM states.
         """
+        # LSTM logic
+        # (sequence length, batch size, features dim)
+        # (batch size = n_envs for data collection or n_seq when doing gradient update)
+        n_seq = lstm_states[0].shape[1]
+        # Batch to sequence
+        # (padded batch size, features_dim) -> (n_seq, max length, features_dim) -> (max length, n_seq, features_dim)
+        # note: max length (max sequence length) is always 1 during data collection
+        features_sequence = features.reshape((n_seq, -1, lstm.input_size)).swapaxes(0, 1)
+        episode_starts = episode_starts.reshape((n_seq, -1)).swapaxes(0, 1)
 
         # If we don't have to reset the state in the middle of a sequence
         # we can avoid the for loop, which speeds up things
-        assert episode_starts.ndim == 2
-        if not th.any(episode_starts[1:]):
-            initial_is_not_reset = (~episode_starts[0]).unsqueeze(-1)
-            lstm_states = (lstm_states[0] * initial_is_not_reset, lstm_states[1] * initial_is_not_reset)
-            lstm_output, lstm_states = lstm(features, lstm_states)
+        if th.all(episode_starts == 0.0):
+            lstm_output, lstm_states = lstm(features_sequence, lstm_states)
+            lstm_output = th.flatten(lstm_output.transpose(0, 1), start_dim=0, end_dim=1)
             return lstm_output, lstm_states
 
         lstm_output = []
         # Iterate over the sequence
-        for features, episode_start in zip_strict(features, episode_starts):
-            is_not_reset = (~episode_start).unsqueeze(-1)
+        for features, episode_start in zip_strict(features_sequence, episode_starts):
             hidden, lstm_states = lstm(
-                features,
+                features.unsqueeze(dim=0),
                 (
                     # Reset the states at the beginning of a new episode
-                    is_not_reset * lstm_states[0],
-                    is_not_reset * lstm_states[1],
+                    (~episode_start).view(1, n_seq, 1) * lstm_states[0],
+                    (~episode_start).view(1, n_seq, 1) * lstm_states[1],
                 ),
             )
-            lstm_output.append(hidden)
-        lstm_output = th.cat(lstm_output)
+            lstm_output += [hidden]
+        # Sequence to batch
+        # (sequence length, n_seq, lstm_out_dim) -> (batch_size, lstm_out_dim)
+        lstm_output = th.flatten(th.cat(lstm_output).transpose(0, 1), start_dim=0, end_dim=1)
         return lstm_output, lstm_states
 
     def forward(
@@ -310,18 +312,6 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         latent_vf = self.mlp_extractor.forward_critic(latent_vf)
         return self.value_net(latent_vf)
 
-    def extract_features(self, obs: TorchGymObs) -> Union[th.Tensor, Tuple[th.Tensor, th.Tensor]]:
-        obs_flat = ot.tree_map(lambda x, x_nobatch: x.view(-1, *x_nobatch.shape), obs, self.observation_example, namespace=NS)
-        obs_batch_shapes = ot.tree_map(
-            lambda x, x_nobatch: x.shape[: x.ndim - x_nobatch.ndim], obs, self.observation_example, namespace=NS
-        )
-
-        (obs_batch_shape, *_), _ = ot.tree_flatten(obs_batch_shapes, namespace=NS)
-
-        features_flat = super().extract_features(obs_flat)
-        features = ot.tree_map(lambda x: x.view(*obs_batch_shape, *x.shape[1:]), features_flat, namespace=NS)
-        return features
-
     def evaluate_actions(
         self, obs: th.Tensor, actions: th.Tensor, lstm_states: LSTMStates, episode_starts: th.Tensor
     ) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
@@ -354,13 +344,10 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         latent_pi = self.mlp_extractor.forward_actor(latent_pi)
         latent_vf = self.mlp_extractor.forward_critic(latent_vf)
 
-        action_batch_shape = actions.shape[:-1]
         distribution = self._get_action_dist_from_latent(latent_pi)
-        distribution_shape = distribution.mode().shape  # FIXME: don't instantiate a tensor for a shape
-        log_prob = distribution.log_prob(actions.view(distribution_shape))
+        log_prob = distribution.log_prob(actions)
         values = self.value_net(latent_vf)
-        entropy = distribution.entropy()
-        return (values.view(action_batch_shape), log_prob.view(action_batch_shape), entropy.view(action_batch_shape))
+        return values, log_prob, distribution.entropy()
 
     def _predict(
         self,

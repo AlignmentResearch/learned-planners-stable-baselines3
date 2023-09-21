@@ -58,7 +58,7 @@ class BaseBuffer(ABC):
         self.n_envs = n_envs
 
     @staticmethod
-    def swap_and_flatten(arr: np.ndarray) -> np.ndarray:
+    def swap_and_flatten(arr: th.Tensor) -> th.Tensor:
         """
         Swap and then flatten axes 0 (buffer_size) and 1 (n_envs)
         to convert shape from [n_steps, n_envs, ...] (when ... is the shape of the features)
@@ -766,7 +766,7 @@ class DictRolloutBuffer(RolloutBuffer):
     :param n_envs: Number of parallel environments
     """
 
-    observations: Dict[str, np.ndarray]
+    observations: Dict[str, th.Tensor]
 
     def __init__(
         self,

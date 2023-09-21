@@ -291,14 +291,9 @@ class RecurrentPPO(OnPolicyAlgorithm):
 
             with th.no_grad():
                 # Convert to pytorch tensor or to TensorDict
-                obs_tensor = ot.tree_map(lambda x: x.unsqueeze(0), obs_as_tensor(self._last_obs, self.device), namespace=NS)
+                obs_tensor = obs_as_tensor(self._last_obs, self.device)
                 episode_starts = th.as_tensor(self._last_episode_starts).to(dtype=th.bool, device=self.device)
-                actions, values, log_probs, lstm_states = self.policy.forward(
-                    obs_tensor, lstm_states, episode_starts.unsqueeze(0)
-                )
-                actions = actions.squeeze(0)
-                values = values.squeeze(0)
-                log_probs = log_probs.squeeze(0)
+                actions, values, log_probs, lstm_states = self.policy.forward(obs_tensor, lstm_states, episode_starts)
 
             # Rescale and perform action
             clipped_actions = actions
@@ -339,10 +334,8 @@ class RecurrentPPO(OnPolicyAlgorithm):
                         # terminal_lstm_state = None
                         episode_starts = th.zeros((1,), dtype=th.bool, device=self.device)
                         terminal_value = self.policy.predict_values(
-                            ot.tree_map(lambda x: x.unsqueeze(0), terminal_obs, namespace=NS),
-                            terminal_lstm_state,
-                            episode_starts.unsqueeze(0),
-                        )[0].squeeze(0)
+                            terminal_obs, terminal_lstm_state, episode_starts
+                        ).squeeze()
                     rewards[idx] += self.gamma * terminal_value
 
             rollout_buffer.add(
@@ -364,11 +357,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
         with th.no_grad():
             # Compute value for the last timestep
             episode_starts = th.as_tensor(dones).to(dtype=th.bool, device=self.device)
-            values = self.policy.predict_values(
-                ot.tree_map(lambda x: x.unsqueeze(0), obs_as_tensor(new_obs, self.device), namespace=NS),
-                lstm_states.vf,
-                episode_starts,
-            )
+            values = self.policy.predict_values(obs_as_tensor(new_obs, self.device), lstm_states.vf, episode_starts)
 
         rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
 
@@ -410,7 +399,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
                 values, log_prob, entropy = self.policy.evaluate_actions(
                     rollout_data.observations,
                     actions,
-                    index_into_pytree(0, rollout_data.hidden_states),
+                    rollout_data.hidden_states,
                     rollout_data.episode_starts,
                 )
 
@@ -433,6 +422,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
                 clip_fraction = th.mean((th.abs(ratio - 1) > clip_range).float()).item()
                 clip_fractions.append(clip_fraction)
 
+                values = values.flatten()
                 if self.clip_range_vf is None:
                     # No clipping
                     values_pred = values

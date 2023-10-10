@@ -1,14 +1,4 @@
-from typing import (
-    Any,
-    Dict,
-    Generic,
-    List,
-    Optional,
-    Protocol,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import Any, Dict, Generic, List, Optional, Protocol, Tuple, Type, Union
 
 import torch as th
 from gymnasium import spaces
@@ -23,65 +13,74 @@ from stable_baselines3.common.recurrent.torch_layers import (
     GRUFlattenExtractor,
     GRUNatureCNNExtractor,
     GRURecurrentState,
+    GRUWrappedFeaturesExtractor,
     RecurrentFeaturesExtractor,
     RecurrentState,
 )
-from stable_baselines3.common.recurrent.type_aliases import (
-    non_null,
-)
+from stable_baselines3.common.recurrent.type_aliases import non_null
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.type_aliases import Schedule, TorchGymObs
-
-
-class RecurrentPolicyProtocol(Protocol, Generic[RecurrentState]):
-    def recurrent_initial_state(self, n_envs: int = 1, *, device: Optional[th.device | str] = None) -> RecurrentState:
-        """
-        Returns the first state for this recurrent policy, without any previous observations.
-
-        :param n_envs: the number of environments (batch size) of this state.
-        :param device: the device that the state should be in.
-        :returns: the initial state for this recurrent policy.
-        """
-
-    def _predict(
-        self,
-        obs: TorchGymObs,
-        state: RecurrentState,
-        episode_starts: th.Tensor,
-        deterministic: bool = False,
-    ) -> Tuple[th.Tensor, RecurrentState]:
-        """
-        Get the action according to the policy for a given observation.
-
-        :param obs: shape (T, B, ...) the policy will be applied in sequence to all the observations.
-        :param state: shape (B, ...), the hidden state of the recurrent network
-        :param episode_starts: shape (T, B), whether the current state is the start of an episode. This should be be 0
-            everywhere except for T=0, where it may be 1.
-        :param deterministic: if True return the best action, else a sample.
-        :return: the model's action and the next hidden state
-        """
-
-    def predict(
-        self,
-        obs: TorchGymObs,
-        state: Optional[RecurrentState] = None,
-        episode_start: Optional[th.Tensor] = None,
-        deterministic: bool = False,
-    ) -> Tuple[th.Tensor, Optional[RecurrentState]]:
-        """
-        Get the policy action from an observation (and optional hidden state).
-        Includes sugar-coating to handle different observations (e.g. normalizing images).
-
-        :param obs: shape (T, B, ...) the policy will be applied in sequence to all the observations.
-        :param state: shape (B, ...), the hidden state of the recurrent network
-        :param episode_starts: shape (T, B), whether the current state is the start of an episode. This should be be 0
-            everywhere except for T=0, where it may be 1.
-        :param deterministic: if True return the best action, else a sample.
-        :return: the model's action and the next hidden state
-        """
 
 
 class RecurrentActorCriticPolicy(ActorCriticPolicy, Generic[RecurrentState]):
     features_extractor: RecurrentFeaturesExtractor[RecurrentState]
+
+    def __init__(
+        self,
+        observation_space: spaces.Space,
+        action_space: spaces.Space,
+        lr_schedule: Schedule,
+        net_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
+        activation_fn: Type[nn.Module] = nn.Tanh,
+        ortho_init: bool = True,
+        use_sde: bool = False,
+        log_std_init: float = 0.0,
+        full_std: bool = True,
+        use_expln: bool = False,
+        squash_output: bool = False,
+        features_extractor_class: Type[BaseFeaturesExtractor] = GRUNatureCNNExtractor,
+        features_extractor_kwargs: Optional[Dict[str, Any]] = None,
+        share_features_extractor: bool = True,
+        normalize_images: bool = True,
+        optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
+        optimizer_kwargs: Optional[Dict[str, Any]] = None,
+    ):
+        if features_extractor_kwargs is None:
+            features_extractor_kwargs = {}
+        # Automatically deactivate dtype and bounds checks
+        if normalize_images is False and issubclass(features_extractor_class, GRUNatureCNNExtractor):
+            features_extractor_kwargs = features_extractor_kwargs.copy()
+            features_extractor_kwargs.update(dict(normalized_image=True))
+
+        if not issubclass(features_extractor_class, RecurrentFeaturesExtractor):
+            base_features_extractor = features_extractor_class(observation_space, **features_extractor_kwargs)
+
+            features_extractor_class = GRUWrappedFeaturesExtractor
+            new_features_extractor_kwargs = dict(base_extractor=base_features_extractor)
+            if "features_dim" in features_extractor_kwargs:
+                new_features_extractor_kwargs["features_dim"] = features_extractor_kwargs["features_dim"]
+            features_extractor_kwargs = new_features_extractor_kwargs
+            print(features_extractor_class, features_extractor_kwargs)
+
+        super().__init__(
+            observation_space,
+            action_space,
+            lr_schedule,
+            net_arch,
+            activation_fn,
+            ortho_init,
+            use_sde,
+            log_std_init,
+            full_std,
+            use_expln,
+            squash_output,
+            features_extractor_class,
+            features_extractor_kwargs,
+            share_features_extractor,
+            normalize_images,
+            optimizer_class,
+            optimizer_kwargs,
+        )
 
     def recurrent_initial_state(
         self, n_envs: Optional[int] = None, *, device: Optional[th.device | str] = None

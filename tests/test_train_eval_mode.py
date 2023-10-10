@@ -117,7 +117,9 @@ def clone_sac_batch_norm_stats(
     return (actor_bias, actor_running_mean, critic_bias, critic_running_mean, critic_target_bias, critic_target_running_mean)
 
 
-def clone_on_policy_batch_norm(model: Union[A2C, PPO]) -> Tuple[th.Tensor, th.Tensor]:
+def clone_on_policy_batch_norm(model: Union[A2C, PPO, RecurrentPPO]) -> Tuple[th.Tensor, th.Tensor]:
+    if isinstance(model, RecurrentPPO):
+        return clone_batch_norm_stats(model.policy.features_extractor.base_extractor.batch_norm)
     return clone_batch_norm_stats(model.policy.features_extractor.batch_norm)
 
 

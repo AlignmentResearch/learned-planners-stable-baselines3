@@ -63,22 +63,25 @@ GRURecurrentState = th.Tensor
 class GRUWrappedFeaturesExtractor(RecurrentFeaturesExtractor[GRURecurrentState]):
     def __init__(
         self,
+        observation_space: gym.Space,
         base_extractor: BaseFeaturesExtractor,
-        hidden_size: Optional[int] = None,
+        features_dim: Optional[int] = None,
         num_layers: int = 1,
         bias: bool = True,
         dropout: float = 0.0,
     ):
-        super().__init__(base_extractor._observation_space, base_extractor.features_dim)
-        self.base_extractor = base_extractor
+        if features_dim is None:
+            # Ensure features_dim is at least 64 by default so it optimizes fine
+            features_dim = max(base_extractor.features_dim, 64)
 
-        if hidden_size is None:
-            # Ensure hidden_size is at least 64 by default so it optimizes fine
-            hidden_size = max(base_extractor.features_dim, 64)
+        assert observation_space == base_extractor._observation_space
+
+        super().__init__(observation_space, features_dim)
+        self.base_extractor = base_extractor
 
         self.rnn = th.nn.GRU(
             input_size=base_extractor.features_dim,
-            hidden_size=hidden_size,
+            hidden_size=features_dim,
             num_layers=num_layers,
             bias=bias,
             batch_first=False,
@@ -111,40 +114,45 @@ class GRUFlattenExtractor(GRUWrappedFeaturesExtractor):
     def __init__(
         self,
         observation_space: gym.Space,
-        hidden_size: Optional[int] = None,
+        features_dim: int = 64,
         num_layers: int = 1,
         bias: bool = True,
         dropout: float = 0.0,
     ) -> None:
         base_extractor = FlattenExtractor(observation_space)
-        super().__init__(base_extractor, hidden_size=hidden_size, num_layers=num_layers, bias=bias, dropout=dropout)
+        super().__init__(
+            observation_space, base_extractor, features_dim=features_dim, num_layers=num_layers, bias=bias, dropout=dropout
+        )
 
 
 class GRUNatureCNNExtractor(GRUWrappedFeaturesExtractor):
     def __init__(
         self,
         observation_space: gym.Space,
-        cnn_output_dim: int = 512,
+        features_dim: int = 512,
         normalized_image: bool = False,
-        hidden_size: Optional[int] = None,
         num_layers: int = 1,
         bias: bool = True,
         dropout: float = 0.0,
     ) -> None:
-        base_extractor = NatureCNN(observation_space, features_dim=cnn_output_dim, normalized_image=normalized_image)
-        super().__init__(base_extractor, hidden_size=hidden_size, num_layers=num_layers, bias=bias, dropout=dropout)
+        base_extractor = NatureCNN(observation_space, features_dim=features_dim, normalized_image=normalized_image)
+        super().__init__(
+            observation_space, base_extractor, features_dim=features_dim, num_layers=num_layers, bias=bias, dropout=dropout
+        )
 
 
 class GRUCombinedExtractor(GRUWrappedFeaturesExtractor):
     def __init__(
         self,
         observation_space: gym.spaces.Dict,
+        features_dim: int = 64,
         cnn_output_dim: int = 256,
         normalized_image: bool = False,
-        hidden_size: Optional[int] = None,
         num_layers: int = 1,
         bias: bool = True,
         dropout: float = 0.0,
     ) -> None:
         base_extractor = CombinedExtractor(observation_space, cnn_output_dim=cnn_output_dim, normalized_image=normalized_image)
-        super().__init__(base_extractor, hidden_size=hidden_size, num_layers=num_layers, bias=bias, dropout=dropout)
+        super().__init__(
+            observation_space, base_extractor, features_dim=features_dim, num_layers=num_layers, bias=bias, dropout=dropout
+        )

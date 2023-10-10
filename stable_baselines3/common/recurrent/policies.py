@@ -1,4 +1,4 @@
-from typing import Any, Dict, Generic, List, Optional, Protocol, Tuple, Type, Union
+from typing import Any, Dict, Generic, List, Optional, Tuple, Type, Union
 
 import torch as th
 from gymnasium import spaces

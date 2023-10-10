@@ -1,15 +1,10 @@
 import abc
-from typing import Any, Generic, Mapping, Optional, Tuple, Type, TypeVar
+from typing import Generic, Optional, Tuple, TypeVar
 
 import gymnasium as gym
 import torch as th
-from gymnasium import spaces
 
-from stable_baselines3.common.distributions import Distribution
-from stable_baselines3.common.policies import ActorCriticPolicy
-from stable_baselines3.common.preprocessing import preprocess_obs
 from stable_baselines3.common.pytree_dataclass import TensorTree, tree_flatten, tree_map
-from stable_baselines3.common.recurrent.type_aliases import non_null
 from stable_baselines3.common.torch_layers import (
     BaseFeaturesExtractor,
     CombinedExtractor,

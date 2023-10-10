@@ -1,7 +1,5 @@
-import abc
 from typing import (
     Any,
-    ClassVar,
     Dict,
     Generic,
     List,
@@ -9,7 +7,6 @@ from typing import (
     Protocol,
     Tuple,
     Type,
-    TypeVar,
     Union,
 )
 
@@ -18,9 +15,9 @@ from gymnasium import spaces
 from torch import nn
 
 from stable_baselines3.common.distributions import Distribution
-from stable_baselines3.common.policies import ActorCriticPolicy, BaseModel, BasePolicy
+from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.preprocessing import preprocess_obs
-from stable_baselines3.common.pytree_dataclass import TensorTree, tree_flatten, tree_map
+from stable_baselines3.common.pytree_dataclass import tree_flatten
 from stable_baselines3.common.recurrent.torch_layers import (
     GRUCombinedExtractor,
     GRUFlattenExtractor,
@@ -30,19 +27,9 @@ from stable_baselines3.common.recurrent.torch_layers import (
     RecurrentState,
 )
 from stable_baselines3.common.recurrent.type_aliases import (
-    LSTMStates,
-    RNNStates,
     non_null,
 )
-from stable_baselines3.common.torch_layers import (
-    BaseFeaturesExtractor,
-    CombinedExtractor,
-    FlattenExtractor,
-    MlpExtractor,
-    NatureCNN,
-)
 from stable_baselines3.common.type_aliases import Schedule, TorchGymObs
-from stable_baselines3.common.utils import zip_strict
 
 
 class RecurrentPolicyProtocol(Protocol, Generic[RecurrentState]):

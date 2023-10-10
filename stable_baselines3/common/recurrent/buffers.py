@@ -1,11 +1,10 @@
 import dataclasses
 from functools import partial
-from typing import Callable, Generator, Optional, Tuple, Union
+from typing import Callable, Generator, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch as th
 from gymnasium import spaces
-
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.pytree_dataclass import (
     TensorTree,
@@ -104,6 +103,62 @@ def create_sequencers(
     local_pad = partial(pad, seq_start_indices, seq_end_indices)
     local_pad_and_flatten = partial(pad_and_flatten, seq_start_indices, seq_end_indices)
     return seq_start_indices, max_length, local_pad, local_pad_and_flatten
+
+
+def separate_sequences(episode_starts: th.Tensor) -> Sequence[Tuple[slice, int]]:
+    """
+    Gives indices in the form of (time slice, env id) for each separate environment episode
+    """
+    episode_starts = episode_starts.clone()
+    episode_starts[0, :] = True
+
+    different_seq_start_indices = th.argwhere(episode_starts.T)
+    max_time = episode_starts.shape[0]
+
+    out = []
+    for i in range(len(different_seq_start_indices) - 1):
+        env_i, time = different_seq_start_indices[i]
+        next_env_i, next_time = different_seq_start_indices[i + 1]
+        if env_i == next_env_i:
+            out.append((slice(time.item(), next_time.item()), env_i.item()))
+        else:
+            out.append((slice(time.item(), max_time), env_i.item()))
+    env_i, time = different_seq_start_indices[-1]
+    out.append((slice(time.item(), max_time), env_i.item()))
+    return out
+
+
+def minibatch_sequences(
+    batch_size: int, idx: Sequence[Tuple[slice, int]]
+) -> Generator[Sequence[Tuple[slice, int]], None, None]:
+    i = 0
+    cur_slice, cur_env = idx[0]
+    cur_start = cur_slice.start
+    cur_stop = cur_slice.stop
+
+    while True:
+        this_batch = []
+        size_until_batch = batch_size
+        while size_until_batch > 0:
+            cur_len = cur_stop - cur_start
+
+            if cur_len > size_until_batch:
+                this_batch.append((slice(cur_start, cur_start+size_until_batch), cur_env))
+                cur_start += size_until_batch
+                size_until_batch = 0
+            else:
+
+            this_batch.append((cur_s, cur_env))
+            accumulated_size +=
+
+
+            i += 1
+
+            else:
+                cur_s, cur_env = idx[i]
+                cur_start = cur_s.start
+                cur_stop = cur_s.stop
+
 
 
 def space_to_example(
@@ -258,34 +313,33 @@ class RecurrentRolloutBuffer(RolloutBuffer):
     ) -> Generator[RecurrentRolloutBufferSamples, None, None]:
         assert self.full, "Rollout buffer must be full before sampling from it"
 
-        hidden_states = tree_map(lambda x: x.swapaxes(1, 2), self.data.hidden_states)
-        data: RecurrentRolloutBufferData = tree_map(
-            self.swap_and_flatten, dataclasses.replace(self.data, hidden_states=hidden_states)  # type: ignore[misc]
-        )
-        returns = self.swap_and_flatten(self.returns)
-        advantages = self.swap_and_flatten(self.advantages)
-
         # Return everything, don't create minibatches
         if batch_size is None:
             batch_size = self.buffer_size * self.n_envs
+
+        if batch_size == self.buffer_size * self.n_envs:
+            pass
+
+        raise NotImplementedError()
 
         # Sampling strategy that allows any mini batch size but requires
         # more complexity and use of padding
         # Trick to shuffle a bit: keep the sequence order
         # but split the indices in two
-        split_index = int(np.random.randint(self.buffer_size * self.n_envs))
+        split_index_flat = int(np.random.randint(self.buffer_size * self.n_envs))
+
+        # (time_idx, env_idx)
+        split_index = (split_index_flat // self.n_envs, split_index_flat % self.n_envs)
+
         indices = th.arange(self.buffer_size * self.n_envs)
         indices = th.cat((indices[split_index:], indices[:split_index]))
 
-        env_change = th.zeros((self.buffer_size, self.n_envs), dtype=th.bool, device=self.device)
-        # Flag first timestep as change of environment
-        env_change[0, :] = True
-        env_change = self.swap_and_flatten(env_change)
+        indices = [(range(self.buffer_size), i) for i in range(self.n_envs)]
 
         start_idx = 0
         while start_idx < self.buffer_size * self.n_envs:
             batch_inds = indices[start_idx : start_idx + batch_size]
-            yield self._get_samples(data, returns, advantages, batch_inds, env_change)
+            yield self._get_samples(self.data, self.returns, self.advantages, batch_inds)
             start_idx += batch_size
 
     def _get_samples(  # type: ignore[override]

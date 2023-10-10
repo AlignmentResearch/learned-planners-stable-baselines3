@@ -58,11 +58,11 @@ class BaseBuffer(ABC):
         self.n_envs = n_envs
 
     @staticmethod
-    def swap_and_flatten(arr: th.Tensor) -> th.Tensor:
+    def flatten_time_and_batch(arr: th.Tensor) -> th.Tensor:
         """
-        Swap and then flatten axes 0 (buffer_size) and 1 (n_envs)
+        flatten axes 0 (buffer_size) and 1 (n_envs)
         to convert shape from [n_steps, n_envs, ...] (when ... is the shape of the features)
-        to [n_steps * n_envs, ...] (which maintain the order)
+        to [n_steps * n_envs, ...] (without maintaining the order, because it doesn't matter)
 
         :param arr:
         :return:
@@ -70,7 +70,7 @@ class BaseBuffer(ABC):
         shape = arr.shape
         if len(shape) < 3:
             shape = (*shape, 1)
-        return arr.transpose(0, 1).reshape(shape[0] * shape[1], *shape[2:])
+        return arr.reshape(shape[0] * shape[1], *shape[2:])
 
     def size(self) -> int:
         """
@@ -523,7 +523,7 @@ class RolloutBuffer(BaseBuffer):
             ]
 
             for tensor in _tensor_names:
-                self.__dict__[tensor] = self.swap_and_flatten(self.__dict__[tensor])
+                self.__dict__[tensor] = self.flatten_time_and_batch(self.__dict__[tensor])
             self.generator_ready = True
 
         # Return everything, don't create minibatches
@@ -871,12 +871,12 @@ class DictRolloutBuffer(RolloutBuffer):
         # Prepare the data
         if not self.generator_ready:
             for key, obs in self.observations.items():
-                self.observations[key] = self.swap_and_flatten(obs)
+                self.observations[key] = self.flatten_time_and_batch(obs)
 
             _tensor_names = ["actions", "values", "log_probs", "advantages", "returns"]
 
             for tensor in _tensor_names:
-                self.__dict__[tensor] = self.swap_and_flatten(self.__dict__[tensor])
+                self.__dict__[tensor] = self.flatten_time_and_batch(self.__dict__[tensor])
             self.generator_ready = True
 
         # Return everything, don't create minibatches

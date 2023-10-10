@@ -1,9 +1,9 @@
 from stable_baselines3.common.recurrent.policies import (
-    RecurrentActorCriticCnnPolicy,
-    RecurrentActorCriticPolicy,
-    RecurrentMultiInputActorCriticPolicy,
+    GRUActorCriticCNNPolicy,
+    GRUActorCriticFlattenPolicy,
+    GRUActorCriticMultiInputPolicy,
 )
 
-MlpLstmPolicy = RecurrentActorCriticPolicy
-CnnLstmPolicy = RecurrentActorCriticCnnPolicy
-MultiInputLstmPolicy = RecurrentMultiInputActorCriticPolicy
+MlpPolicy = GRUActorCriticFlattenPolicy
+CnnPolicy = GRUActorCriticCNNPolicy
+MultiInputPolicy = GRUActorCriticMultiInputPolicy

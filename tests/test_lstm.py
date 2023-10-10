@@ -68,34 +68,26 @@ def test_env():
     "policy_kwargs",
     [
         {},
-        {"share_features_extractor": False},
-        dict(shared_lstm=True, enable_critic_lstm=False),
         dict(
-            enable_critic_lstm=True,
-            lstm_hidden_size=4,
-            lstm_kwargs=dict(dropout=0.5),
-            n_lstm_layers=2,
-        ),
-        dict(
-            enable_critic_lstm=False,
-            lstm_hidden_size=4,
-            lstm_kwargs=dict(dropout=0.5),
-            n_lstm_layers=2,
-        ),
-        dict(
-            enable_critic_lstm=False,
-            lstm_hidden_size=4,
-            share_features_extractor=False,
+            features_extractor_kwargs=dict(
+                hidden_size=4,
+                dropout=0.5,
+                num_layers=2,
+            )
         ),
     ],
 )
 def test_cnn(policy_kwargs):
+    features_extractor_kwargs = policy_kwargs.get("features_extractor_kwargs", {})
+    features_extractor_kwargs.update(dict(cnn_output_dim=32))
+    policy_kwargs["features_extractor_kwargs"] = features_extractor_kwargs
+
     model = RecurrentPPO(
-        "CnnLstmPolicy",
+        "CnnPolicy",
         FakeImageEnv(screen_height=40, screen_width=40, n_channels=3),
         n_steps=16,
         seed=0,
-        policy_kwargs=dict(**policy_kwargs, features_extractor_kwargs=dict(features_dim=32)),
+        policy_kwargs=policy_kwargs,
         n_epochs=2,
     )
 
@@ -106,24 +98,18 @@ def test_cnn(policy_kwargs):
     "policy_kwargs",
     [
         {},
-        dict(shared_lstm=True, enable_critic_lstm=False),
         dict(
-            enable_critic_lstm=True,
-            lstm_hidden_size=4,
-            lstm_kwargs=dict(dropout=0.5),
-            n_lstm_layers=2,
-        ),
-        dict(
-            enable_critic_lstm=False,
-            lstm_hidden_size=4,
-            lstm_kwargs=dict(dropout=0.5),
-            n_lstm_layers=2,
+            features_extractor_kwargs=dict(
+                hidden_size=4,
+                dropout=0.5,
+                num_layers=2,
+            )
         ),
     ],
 )
 def test_policy_kwargs(policy_kwargs):
     model = RecurrentPPO(
-        "MlpLstmPolicy",
+        "MlpPolicy",
         "CartPole-v1",
         n_steps=16,
         seed=0,
@@ -133,32 +119,10 @@ def test_policy_kwargs(policy_kwargs):
     model.learn(total_timesteps=32)
 
 
-def test_check():
-    policy_kwargs = dict(shared_lstm=True, enable_critic_lstm=True)
-    with pytest.raises(AssertionError):
-        RecurrentPPO(
-            "MlpLstmPolicy",
-            "CartPole-v1",
-            n_steps=16,
-            seed=0,
-            policy_kwargs=policy_kwargs,
-        )
-
-    policy_kwargs = dict(shared_lstm=True, enable_critic_lstm=False, share_features_extractor=False)
-    with pytest.raises(AssertionError):
-        RecurrentPPO(
-            "MlpLstmPolicy",
-            "CartPole-v1",
-            n_steps=16,
-            seed=0,
-            policy_kwargs=policy_kwargs,
-        )
-
-
 @pytest.mark.parametrize("env", ["Pendulum-v1", "CartPole-v1"])
 def test_run(env):
     model = RecurrentPPO(
-        "MlpLstmPolicy",
+        "MlpPolicy",
         env,
         n_steps=16,
         seed=0,
@@ -169,7 +133,7 @@ def test_run(env):
 
 def test_run_sde():
     model = RecurrentPPO(
-        "MlpLstmPolicy",
+        "MlpPolicy",
         "Pendulum-v1",
         n_steps=16,
         seed=0,
@@ -185,24 +149,18 @@ def test_run_sde():
     "policy_kwargs",
     [
         {},
-        dict(shared_lstm=True, enable_critic_lstm=False),
         dict(
-            enable_critic_lstm=True,
-            lstm_hidden_size=4,
-            lstm_kwargs=dict(dropout=0.5),
-            n_lstm_layers=2,
-        ),
-        dict(
-            enable_critic_lstm=False,
-            lstm_hidden_size=4,
-            lstm_kwargs=dict(dropout=0.5),
-            n_lstm_layers=2,
+            features_extractor_kwargs=dict(
+                hidden_size=4,
+                dropout=0.5,
+                num_layers=2,
+            )
         ),
     ],
 )
 def test_dict_obs(policy_kwargs):
     env = make_vec_env("CartPole-v1", n_envs=1, wrapper_class=ToDictWrapper)
-    model = RecurrentPPO("MultiInputLstmPolicy", env, n_steps=32, policy_kwargs=policy_kwargs).learn(64)
+    model = RecurrentPPO("MultiInputPolicy", env, n_steps=32, policy_kwargs=policy_kwargs).learn(64)
     evaluate_policy(model, env, warn=False)
 
 
@@ -223,7 +181,7 @@ def test_ppo_lstm_performance():
     )
 
     model = RecurrentPPO(
-        "MlpLstmPolicy",
+        "MlpPolicy",
         env,
         n_steps=128,
         learning_rate=0.0007,
@@ -235,9 +193,8 @@ def test_ppo_lstm_performance():
         gae_lambda=0.98,
         policy_kwargs=dict(
             net_arch=dict(vf=[64], pi=[]),
-            lstm_hidden_size=64,
+            features_extractor_kwargs=dict(hidden_size=64),
             ortho_init=False,
-            enable_critic_lstm=True,
         ),
     )
 

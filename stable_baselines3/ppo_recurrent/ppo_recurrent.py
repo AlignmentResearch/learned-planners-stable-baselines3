@@ -27,9 +27,9 @@ from stable_baselines3.common.utils import (
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.vec_env.util import obs_as_tensor
 from stable_baselines3.ppo_recurrent.policies import (
-    CnnLstmPolicy,
-    MlpLstmPolicy,
-    MultiInputLstmPolicy,
+    CnnPolicy,
+    MlpPolicy,
+    MultiInputPolicy,
 )
 
 SelfRecurrentPPO = TypeVar("SelfRecurrentPPO", bound="RecurrentPPO")
@@ -81,12 +81,9 @@ class RecurrentPPO(OnPolicyAlgorithm):
     """
 
     policy_aliases: ClassVar[Dict[str, Type[BasePolicy]]] = {
-        "MlpLstmPolicy": MlpLstmPolicy,
-        "CnnLstmPolicy": CnnLstmPolicy,
-        "MultiInputLstmPolicy": MultiInputLstmPolicy,
-        "MlpPolicy": MlpLstmPolicy,
-        "CnnPolicy": CnnLstmPolicy,
-        "MultiInputPolicy": MultiInputLstmPolicy,
+        "MlpPolicy": MlpPolicy,
+        "CnnPolicy": CnnPolicy,
+        "MultiInputPolicy": MultiInputPolicy,
     }
 
     policy: RecurrentActorCriticPolicy

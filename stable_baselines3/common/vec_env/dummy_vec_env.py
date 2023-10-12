@@ -4,11 +4,23 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, List, Optional, Sequence, Type, cast
 
 import gymnasium as gym
+import numpy as np
 import torch as th
 
-from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvIndices, VecEnvObs, VecEnvStepReturn
+from stable_baselines3.common.vec_env.base_vec_env import (
+    VecEnv,
+    VecEnvIndices,
+    VecEnvObs,
+    VecEnvStepReturn,
+)
 from stable_baselines3.common.vec_env.patch_gym import _patch_env
-from stable_baselines3.common.vec_env.util import copy_obs_dict, dict_to_obs, obs_as_np, obs_as_tensor, obs_space_info
+from stable_baselines3.common.vec_env.util import (
+    copy_obs_dict,
+    dict_to_obs,
+    obs_as_np,
+    obs_as_tensor,
+    obs_space_info,
+)
 
 
 class DummyVecEnv(VecEnv):
@@ -95,7 +107,7 @@ class DummyVecEnv(VecEnv):
             return [None for _ in self.envs]
         return cast(Sequence[th.Tensor], th.stack([th.as_tensor(env.render()) for env in self.envs]))
 
-    def render(self, mode: Optional[str] = None) -> Optional[th.Tensor]:
+    def render(self, mode: Optional[str] = None) -> Optional[np.ndarray]:
         """
         Gym environment rendering. If there are multiple environments then
         they are tiled together in one image via ``BaseVecEnv.render()``.

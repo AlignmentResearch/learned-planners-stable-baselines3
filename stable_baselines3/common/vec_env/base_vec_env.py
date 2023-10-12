@@ -24,7 +24,8 @@ VecEnvStepReturn = Tuple[VecEnvObs, th.Tensor, th.Tensor, List[Dict]]
 EnvObs = Union[np.ndarray, Dict[str, np.ndarray], Tuple[np.ndarray, ...]]
 
 
-def tile_images(images_nhwc: Sequence[th.Tensor]) -> th.Tensor:  # pragma: no cover
+# Sadly th.Tensor is not a Sequence, even though it is iterable.
+def tile_images(images_nhwc: th.Tensor | Sequence[th.Tensor]) -> th.Tensor:  # pragma: no cover
     """
     Tile N images into one big PxQ image
     (P,Q) are chosen to be as close as possible, and if N
@@ -214,7 +215,7 @@ class VecEnv(ABC):
         """
         raise NotImplementedError
 
-    def render(self, mode: Optional[str] = None) -> Optional[th.Tensor]:
+    def render(self, mode: Optional[str] = None) -> Optional[np.ndarray]:
         """
         Gym environment rendering
 

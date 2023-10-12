@@ -259,16 +259,16 @@ class VecEnv(ABC):
             images = self.get_images()
             # Create a big image by tiling images from subprocesses
             bigimg = tile_images(images)  # type: ignore[arg-type]
+            img_np = bigimg.detach().cpu().numpy()
 
             if mode == "human":
                 # Display it using OpenCV
                 import cv2  # pytype:disable=import-error
 
-                assert bigimg.device == th.device("cpu")
-                cv2.imshow("vecenv", bigimg.numpy()[:, :, ::-1])
+                cv2.imshow("vecenv", img_np[:, :, ::-1])
                 cv2.waitKey(1)
             else:
-                return bigimg
+                return img_np
 
         else:
             # Other render modes:
@@ -375,7 +375,7 @@ class VecEnvWrapper(VecEnv):
     def close(self) -> None:
         return self.venv.close()
 
-    def render(self, mode: Optional[str] = None) -> Optional[th.Tensor]:
+    def render(self, mode: Optional[str] = None) -> Optional[np.ndarray]:
         return self.venv.render(mode=mode)
 
     def get_images(self) -> Sequence[Optional[th.Tensor]]:

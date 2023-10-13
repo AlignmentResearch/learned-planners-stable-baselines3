@@ -136,8 +136,10 @@ class _PyTreeDataclassBase(CustomTreeNode[T], metaclass=_PyTreeDataclassMeta):
     @classmethod
     def _names(cls) -> Tuple[str, ...]:
         if cls._names_cache is None:
-            cls._names_cache = tuple(f.name for f in dataclasses.fields(cls))
-        return cls._names_cache
+            names = cls._names_cache = tuple(f.name for f in dataclasses.fields(cls))
+        else:
+            names = cls._names_cache
+        return names
 
     def __iter__(self):
         seq, _, _ = self.tree_flatten()

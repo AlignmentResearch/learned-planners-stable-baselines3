@@ -21,7 +21,11 @@ except ImportError:
 
 from stable_baselines3.common import base_class  # pytype: disable=pyi-error
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, sync_envs_normalization
+from stable_baselines3.common.vec_env import (
+    DummyVecEnv,
+    VecEnv,
+    sync_envs_normalization,
+)
 
 
 class BaseCallback(ABC):
@@ -407,8 +411,10 @@ class EvalCallback(EventCallback):
 
     def _init_callback(self) -> None:
         # Does not work in some corner cases, where the wrapper is not the same
-        if not isinstance(self.training_env, type(self.eval_env)):
-            warnings.warn("Training and eval env are not of the same type" f"{self.training_env} != {self.eval_env}")
+        if not isinstance(self.training_env.unwrapped, type(self.eval_env.unwrapped)):
+            warnings.warn(
+                "Training and eval env are not of the same type" f"{self.training_env.unwrapped} != {self.eval_env.unwrapped}"
+            )
 
         # Create folders if needed
         if self.best_model_save_path is not None:

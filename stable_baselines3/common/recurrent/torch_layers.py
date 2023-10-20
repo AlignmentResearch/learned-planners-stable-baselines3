@@ -1,5 +1,5 @@
 import abc
-from typing import Any, Dict, Generic, Optional, Tuple, TypeVar
+from typing import Any, ClassVar, Dict, Generic, Optional, Tuple, TypeVar
 
 import gymnasium as gym
 import torch as th
@@ -26,6 +26,8 @@ ExtractorInput = TypeVar("ExtractorInput", bound=TorchGymObs)
 
 
 class RecurrentFeaturesExtractor(BaseFeaturesExtractor, abc.ABC, Generic[ExtractorInput, RecurrentState]):
+    iterative_way: ClassVar[bool] = False
+
     @abc.abstractmethod
     def recurrent_initial_state(
         self, n_envs: Optional[int] = None, *, device: Optional[th.device | str] = None
@@ -38,9 +40,9 @@ class RecurrentFeaturesExtractor(BaseFeaturesExtractor, abc.ABC, Generic[Extract
     ) -> Tuple[th.Tensor, RecurrentState]:
         ...
 
-    @staticmethod
+    @classmethod
     def _process_sequence(
-        rnn: th.nn.RNNBase, inputs: th.Tensor, init_state: RecurrentSubState, episode_starts: th.Tensor
+        cls, rnn: th.nn.RNNBase, inputs: th.Tensor, init_state: RecurrentSubState, episode_starts: th.Tensor
     ) -> Tuple[th.Tensor, RecurrentSubState]:
         (state_example, *_), _ = tree_flatten(init_state, is_leaf=None)
         n_layers, batch_sz, *_ = state_example.shape
@@ -63,7 +65,17 @@ class RecurrentFeaturesExtractor(BaseFeaturesExtractor, abc.ABC, Generic[Extract
             return state * reset_mask
 
         init_state = tree_map(_reset_state_component, init_state)
-        rnn_output, end_state = rnn(seq_inputs, init_state)
+        end_state: RecurrentSubState
+        rnn_output: th.Tensor
+
+        if not cls.iterative_way:
+            rnn_output, end_state = rnn(seq_inputs, init_state)
+        else:
+            rnn_outputs: list[th.Tensor] = [None] * len(seq_inputs)  # type: ignore
+            rnn_outputs[0], end_state = rnn(seq_inputs[0:1], init_state)
+            for i in range(1, len(seq_inputs)):
+                rnn_outputs[i], end_state = rnn(seq_inputs[i : i + 1], end_state)
+            rnn_output = th.cat(rnn_outputs, dim=0)
 
         # (seq_len, batch_size, ...) -> (batch_size, seq_len, ...) -> (batch_size * seq_len, ...)
         rnn_output = rnn_output.transpose(0, 1).reshape((batch_sz * seq_len, *rnn_output.shape[2:]))

@@ -21,6 +21,7 @@ from stable_baselines3.common.recurrent.torch_layers import (
     GRUCombinedExtractor,
     GRUFlattenExtractor,
     GRUNatureCNNExtractor,
+    RecurrentFeaturesExtractor,
 )
 from stable_baselines3.common.vec_env import VecNormalize
 
@@ -251,7 +252,10 @@ def test_dict_obs_recurrent_extractor():
 
 @pytest.mark.expensive
 @pytest.mark.parametrize("policy", ["MlpLstmPolicy", "GRUFeatureExtractorPolicy"])
-def test_ppo_lstm_performance(policy: str | type[BaseRecurrentActorCriticPolicy]):
+@pytest.mark.parametrize("iterative_way", [True, False])
+def test_ppo_lstm_performance(policy: str | type[BaseRecurrentActorCriticPolicy], iterative_way: bool):
+    RecurrentFeaturesExtractor.iterative_way = iterative_way
+
     # env = make_vec_env("CartPole-v1", n_envs=16)
     def make_env():
         env = CartPoleNoVelEnv()

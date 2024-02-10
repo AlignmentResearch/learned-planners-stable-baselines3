@@ -71,7 +71,7 @@ jobs:
           password: "$GHCR_DOCKER_TOKEN"
     resource_class: alignmentresearch/medium
     working_directory: /workspace/third_party/stable-baselines3
-    parallelism: 14
+    parallelism: 16
     steps:
       - checkout
       - run:

@@ -6,6 +6,7 @@ import numpy as np
 import torch as th
 
 from stable_baselines3.common import type_aliases
+from stable_baselines3.common.pytree_dataclass import TensorTree
 from stable_baselines3.common.vec_env import (
     DummyVecEnv,
     VecEnv,
@@ -25,6 +26,7 @@ def evaluate_policy(
     reward_threshold: Optional[float] = None,
     return_episode_rewards: bool = False,
     warn: bool = True,
+    initial_states: Optional[TensorTree] = None,
 ) -> Union[Tuple[float, float], Tuple[List[float], List[int]]]:
     """
     Runs policy for ``n_eval_episodes`` episodes and returns average reward.
@@ -92,7 +94,7 @@ def evaluate_policy(
     # Divides episodes among different sub environments in the vector as evenly as possible
     episode_count_targets = th.tensor([(n_eval_episodes + i) // n_envs for i in range(n_envs)], dtype=th.int64, device="cpu")
 
-    states = None
+    states = initial_states
     current_rewards = th.zeros(n_envs, dtype=th.float32, device="cpu")
     current_lengths = th.zeros(n_envs, dtype=th.int64, device="cpu")
     episode_starts = th.ones((env.num_envs,), dtype=th.bool, device=model.device)

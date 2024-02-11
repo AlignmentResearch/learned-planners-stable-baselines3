@@ -1,7 +1,7 @@
 import os
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import gymnasium as gym
 import numpy as np
@@ -21,7 +21,11 @@ except ImportError:
 
 from stable_baselines3.common import base_class  # pytype: disable=pyi-error
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, sync_envs_normalization
+from stable_baselines3.common.vec_env import (
+    DummyVecEnv,
+    VecEnv,
+    sync_envs_normalization,
+)
 
 
 class BaseCallback(ABC):
@@ -436,6 +440,18 @@ class EvalCallback(EventCallback):
             if maybe_is_success is not None:
                 self._is_success_buffer.append(maybe_is_success)
 
+    def _evaluate_policy(self) -> Tuple[List[float], List[int]]:
+        return evaluate_policy(
+            self.model,
+            self.eval_env,
+            n_eval_episodes=self.n_eval_episodes,
+            render=self.render,
+            deterministic=self.deterministic,
+            return_episode_rewards=True,
+            warn=self.warn,
+            callback=self._log_success_callback,
+        )
+
     def _on_step(self) -> bool:
         continue_training = True
 
@@ -453,17 +469,7 @@ class EvalCallback(EventCallback):
 
             # Reset success rate buffer
             self._is_success_buffer = []
-
-            episode_rewards, episode_lengths = evaluate_policy(
-                self.model,
-                self.eval_env,
-                n_eval_episodes=self.n_eval_episodes,
-                render=self.render,
-                deterministic=self.deterministic,
-                return_episode_rewards=True,
-                warn=self.warn,
-                callback=self._log_success_callback,
-            )
+            episode_rewards, episode_lengths = self._evaluate_policy()
 
             if self.log_path is not None:
                 assert isinstance(episode_rewards, list)

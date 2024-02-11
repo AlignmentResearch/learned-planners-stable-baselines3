@@ -440,7 +440,7 @@ class EvalCallback(EventCallback):
             if maybe_is_success is not None:
                 self._is_success_buffer.append(maybe_is_success)
 
-    def _evaluate_policy(self) -> Tuple[List[float], List[int]]:
+    def _evaluate_policy(self) -> Union[Tuple[float, float], Tuple[List[float], List[int]]]:
         return evaluate_policy(
             self.model,
             self.eval_env,

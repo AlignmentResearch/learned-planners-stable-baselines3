@@ -5,6 +5,7 @@ from typing import Any, ClassVar, Dict, Optional, Type, TypeVar, Union
 
 import numpy as np
 import torch as th
+import torch.nn.functional as F
 from gymnasium import spaces
 
 from stable_baselines3.common.callbacks import BaseCallback
@@ -243,6 +244,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
 
             self.clip_range_vf = get_schedule_fn(self.clip_range_vf)
 
+    @th.no_grad()
     def collect_rollouts(  # type: ignore[override]
         self,
         env: VecEnv,
@@ -280,6 +282,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
 
         lstm_states = non_null(self._last_lstm_states)
 
+        all_rollout_rewards = []
         while n_steps < n_rollout_steps:
             if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
                 # Sample a new noise matrix
@@ -300,6 +303,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
                 )
 
             new_obs, rewards, dones, infos = env.step(clipped_actions)
+            all_rollout_rewards.append(rewards.mean().item())
 
             self.num_timesteps += env.num_envs
 
@@ -351,10 +355,11 @@ class RecurrentPPO(OnPolicyAlgorithm):
             self._last_episode_starts = dones.to(self.device)
             self._last_lstm_states = lstm_states
 
-        with th.no_grad():
-            # Compute value for the last timestep
-            dones = episode_starts = th.as_tensor(dones).to(dtype=th.bool, device=self.device)
-            values = self.policy.predict_values(obs_as_tensor(new_obs, self.device), lstm_states, episode_starts)
+        self.logger.record("train/reward", np.mean(all_rollout_rewards))
+
+        # Compute value for the last timestep
+        dones = episode_starts = th.as_tensor(dones).to(dtype=th.bool, device=self.device)
+        values = self.policy.predict_values(obs_as_tensor(new_obs, self.device), lstm_states, episode_starts)
 
         rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
 
@@ -414,7 +419,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
                 # clipped surrogate loss
                 policy_loss_1 = advantages * ratio
                 policy_loss_2 = advantages * th.clamp(ratio, 1 - clip_range, 1 + clip_range)
-                policy_loss = -th.mean(th.min(policy_loss_1, policy_loss_2))
+                policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
 
                 # Logging
                 pg_losses.append(policy_loss.item())
@@ -426,15 +431,13 @@ class RecurrentPPO(OnPolicyAlgorithm):
                     # No clipping
                     values_pred = values
                 else:
-                    # Clip the different between old and new value
+                    # Clip the difference between old and new value
                     # NOTE: this depends on the reward scaling
                     values_pred = rollout_data.old_values + th.clamp(
                         values - rollout_data.old_values, -clip_range_vf, clip_range_vf
                     )
                 # Value loss using the TD(gae_lambda) target
-                # Mask padded sequences
-                value_loss = th.mean((rollout_data.returns - values_pred) ** 2)
-
+                value_loss = F.mse_loss(rollout_data.returns, values_pred)
                 value_losses.append(value_loss.item())
 
                 # Entropy loss favor exploration
@@ -469,11 +472,11 @@ class RecurrentPPO(OnPolicyAlgorithm):
                 # Clip grad norm
                 th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
                 self.policy.optimizer.step()
-
+            self._n_updates += 1
             if not continue_training:
                 break
+        self.policy.optimizer.zero_grad(set_to_none=True)  # Free gradients until the next call to .train()
 
-        self._n_updates += self.n_epochs
         explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
 
         # Logs

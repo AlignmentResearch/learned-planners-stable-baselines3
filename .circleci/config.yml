@@ -39,7 +39,7 @@ jobs:
         auth:
           username: "$GHCR_DOCKER_USER"
           password: "$GHCR_DOCKER_TOKEN"
-    resource_class: large
+    resource_class: alignmentresearch/large
     working_directory: /workspace/third_party/stable-baselines3
     steps:
       - checkout
@@ -58,7 +58,7 @@ jobs:
         auth:
           username: "$GHCR_DOCKER_USER"
           password: "$GHCR_DOCKER_TOKEN"
-    resource_class: large
+    resource_class: alignmentresearch/large
     working_directory: /workspace/third_party/stable-baselines3
     steps:
       - checkout
@@ -69,7 +69,7 @@ jobs:
         auth:
           username: "$GHCR_DOCKER_USER"
           password: "$GHCR_DOCKER_TOKEN"
-    resource_class: medium
+    resource_class: alignmentresearch/medium
     working_directory: /workspace/third_party/stable-baselines3
     parallelism: 14
     steps:

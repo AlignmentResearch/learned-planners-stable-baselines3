@@ -97,12 +97,13 @@ def evaluate_policy(
     current_lengths = th.zeros(n_envs, dtype=th.int64, device="cpu")
     episode_starts = th.ones((env.num_envs,), dtype=th.bool, device=model.device)
     while (episode_counts < episode_count_targets).any():
-        actions, states = model.predict(
-            observations,  # type: ignore[arg-type]
-            state=states,
-            episode_start=episode_starts,
-            deterministic=deterministic,
-        )
+        with th.no_grad():
+            actions, states = model.predict(
+                observations,  # type: ignore[arg-type]
+                state=states,
+                episode_start=episode_starts,
+                deterministic=deterministic,
+            )
         new_observations, rewards, dones, infos = env.step(actions)
         current_rewards += rewards.to(current_rewards)
         current_lengths += 1

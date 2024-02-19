@@ -236,10 +236,12 @@ def test_run_sde_recurrent_extractor():
         ),
     ],
 )
-def test_dict_obs(policy_kwargs):
-    env = make_vec_env("CartPole-v1", n_envs=1, wrapper_class=ToDictWrapper)
+@pytest.mark.parametrize("n_steps_to_think", [0, 1, 4])
+def test_dict_obs(policy_kwargs, n_steps_to_think):
+    N_ENVS = 10
+    env = make_vec_env("CartPole-v1", n_envs=N_ENVS, wrapper_class=ToDictWrapper)
     model = RecurrentPPO("MultiInputLstmPolicy", env, n_steps=32, policy_kwargs=policy_kwargs).learn(64)
-    evaluate_policy(model, env, warn=False)
+    evaluate_policy(model, env, n_eval_episodes=N_ENVS, warn=False, n_steps_to_think=n_steps_to_think)
 
 
 def test_dict_obs_recurrent_extractor():

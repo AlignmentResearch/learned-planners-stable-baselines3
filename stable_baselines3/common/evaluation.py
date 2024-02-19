@@ -25,6 +25,7 @@ def evaluate_policy(
     reward_threshold: Optional[float] = None,
     return_episode_rewards: bool = False,
     warn: bool = True,
+    n_steps_to_think: int = 0,
 ) -> Union[Tuple[float, float], Tuple[List[float], List[int]]]:
     """
     Runs policy for ``n_eval_episodes`` episodes and returns average reward.
@@ -87,15 +88,25 @@ def evaluate_policy(
 
     # Hardcode episode counts and the reward accumulators to use CPU. They're used for bookkeeping and don't involve
     # much computation.
-
     episode_counts = th.zeros(n_envs, dtype=th.int64, device="cpu")
     # Divides episodes among different sub environments in the vector as evenly as possible
     episode_count_targets = th.tensor([(n_eval_episodes + i) // n_envs for i in range(n_envs)], dtype=th.int64, device="cpu")
 
+    episode_starts_yes = th.ones((env.num_envs,), dtype=th.bool, device=model.device)
+    episode_starts_no = th.zeros((env.num_envs,), dtype=th.bool, device=model.device)
     states = None
+    for step_i in range(n_steps_to_think):
+        assert (episode_count_targets <= 1).all(), "If episodes count several times the steps to think won't be accurate."
+        _, states = model.predict(
+            observations,  # type: ignore[arg-type]
+            state=states,
+            episode_start=(episode_starts_yes if step_i == 0 else episode_starts_no),
+            deterministic=deterministic,
+        )
+
     current_rewards = th.zeros(n_envs, dtype=th.float32, device="cpu")
     current_lengths = th.zeros(n_envs, dtype=th.int64, device="cpu")
-    episode_starts = th.ones((env.num_envs,), dtype=th.bool, device=model.device)
+    episode_starts = episode_starts_yes
     while (episode_counts < episode_count_targets).any():
         with th.no_grad():
             actions, states = model.predict(

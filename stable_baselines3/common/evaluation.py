@@ -96,7 +96,12 @@ def evaluate_policy(
     episode_starts_no = th.zeros((env.num_envs,), dtype=th.bool, device=model.device)
     states = None
     for step_i in range(n_steps_to_think):
-        assert (episode_count_targets <= 1).all(), "If episodes count several times the steps to think won't be accurate."
+        if (episode_count_targets > 1).any():
+            raise NotImplementedError(
+                """steps-to-think only get applied at the beginning of the `evaluate_policy` function loop. Thus, if any
+of `episode_count_targets > 1`, for the 2nd episode and beyond the policy won't have any extra steps to think."""
+            )
+
         _, states = model.predict(
             observations,  # type: ignore[arg-type]
             state=states,

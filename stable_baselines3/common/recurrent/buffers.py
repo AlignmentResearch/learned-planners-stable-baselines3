@@ -230,17 +230,18 @@ class RecurrentRolloutBuffer(RolloutBuffer):
 
             for i in range(0, len(batch_indices), batch_envs):
                 (first_time_idx, first_env_idx), idx = dset.get_batch_and_init_times(batch_indices[i : i + batch_envs])
+                idx_fn = functools.partial(_index_first_shape, idx)
                 yield RecurrentRolloutBufferSamples(
-                    observations=tree_map(functools.partial(_index_first_shape, idx), self.data.observations),
-                    actions=self.data.actions.view(-1)[idx],
-                    old_values=self.data.values.view(-1)[idx],
-                    old_log_prob=self.data.log_probs.view(-1)[idx],
-                    advantages=self.advantages.view(-1)[idx],
-                    returns=self.returns.view(-1)[idx],
+                    observations=tree_map(idx_fn, self.data.observations),
+                    actions=idx_fn(self.data.actions),
+                    old_values=idx_fn(self.data.values),
+                    old_log_prob=idx_fn(self.data.log_probs),
+                    advantages=idx_fn(self.advantages),
+                    returns=idx_fn(self.returns),
                     hidden_states=tree_map(
                         functools.partial(_index_first_time, first_time_idx, first_env_idx), self.data.hidden_states
                     ),
-                    episode_starts=self.data.episode_starts.view(-1)[idx],
+                    episode_starts=idx_fn(self.data.episode_starts),
                 )
 
     def _get_samples(  # type: ignore[override]

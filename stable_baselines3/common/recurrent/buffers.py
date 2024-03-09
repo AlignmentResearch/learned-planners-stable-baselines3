@@ -225,6 +225,9 @@ class RecurrentRolloutBuffer(RolloutBuffer):
             def _index_first_shape(idx, x):
                 return x.view(x.shape[0] * x.shape[1], *x.shape[2:])[idx]
 
+            def _index_first_time(first_time_idx, first_env_idx, x):
+                return x[first_time_idx, slice(None), first_env_idx].moveaxis(0, 1)
+
             for i in range(0, len(batch_indices), batch_envs):
                 (first_time_idx, first_env_idx), idx = dset.get_batch_and_init_times(batch_indices[i : i + batch_envs])
                 yield RecurrentRolloutBufferSamples(
@@ -234,7 +237,9 @@ class RecurrentRolloutBuffer(RolloutBuffer):
                     old_log_prob=self.data.log_probs.view(-1)[idx],
                     advantages=self.advantages.view(-1)[idx],
                     returns=self.returns.view(-1)[idx],
-                    hidden_states=tree_index(self.data.hidden_states, (first_time_idx, slice(None), first_env_idx)),
+                    hidden_states=tree_map(
+                        functools.partial(_index_first_time, first_time_idx, first_env_idx), self.data.hidden_states
+                    ),
                     episode_starts=self.data.episode_starts.view(-1)[idx],
                 )
 

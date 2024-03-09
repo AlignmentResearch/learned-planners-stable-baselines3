@@ -16,6 +16,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.envs import FakeImageEnv
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.pytree_dataclass import SB3_NAMESPACE
+from stable_baselines3.common.recurrent.buffers import SamplingType
 from stable_baselines3.common.recurrent.policies import (
     BaseRecurrentActorCriticPolicy,
     RecurrentFeaturesExtractorActorCriticPolicy,
@@ -273,7 +274,8 @@ def test_dict_obs_recurrent_extractor():
 
 @pytest.mark.expensive
 @pytest.mark.parametrize("policy", ["MlpLstmPolicy", "GRUFeatureExtractorPolicy"])
-def test_ppo_lstm_performance(policy: str | type[BaseRecurrentActorCriticPolicy]):
+@pytest.mark.parametrize("sampling_type", [SamplingType.CLASSIC, SamplingType.SKEW_RANDOM, SamplingType.SKEW_ZEROS])
+def test_ppo_lstm_performance(policy: str | type[BaseRecurrentActorCriticPolicy], sampling_type: SamplingType):
     # env = make_vec_env("CartPole-v1", n_envs=16)
     def make_env():
         env = CartPoleNoVelEnv()
@@ -307,6 +309,7 @@ def test_ppo_lstm_performance(policy: str | type[BaseRecurrentActorCriticPolicy]
         verbose=1,
         batch_envs=N_ENVS,
         batch_time=BATCH_TIME,
+        sampling_type=sampling_type,
         seed=1,
         n_epochs=10,
         max_grad_norm=1,

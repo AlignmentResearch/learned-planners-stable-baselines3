@@ -39,6 +39,38 @@ def space_to_example(
     return tree_map(_zeros_with_batch, space.sample())
 
 
+class TimeContiguousBatchesDataset(th.utils.data.Dataset[th.Tensor]):
+    def __init__(self, num_envs: int, num_time: int, batch_time: int, skew: th.Tensor):
+        assert batch_time > 0 and num_envs > 0 and num_time > 0
+        assert num_time >= batch_time
+        assert num_time % batch_time == 0
+        assert skew.shape == (num_envs,)
+        assert th.all(skew < num_time)
+
+        self.num_envs = num_envs
+        self.num_time = num_time
+        self.batch_time = batch_time
+        self.skew = skew
+        self.total_size = self.num_envs * self.num_time
+
+    def __getitem__(self, index: int) -> th.Tensor:
+        which_env = index % self.num_envs
+        which_time_batch = (index // self.num_envs) * self.batch_time
+        skew = self.skew[which_env]
+        return which_env + self.num_envs * ((which_time_batch + skew + th.arange(self.batch_time)) % self.num_time)
+
+    def __getitems__(self, indices: th.Tensor) -> th.Tensor:
+        which_env = indices % self.num_envs
+        which_time_batch = (indices // self.num_envs) * self.batch_time
+        skew = self.skew[which_env]
+        return which_env.unsqueeze(1) + self.num_envs * (
+            ((which_time_batch + skew).unsqueeze(1) + th.arange(self.batch_time)) % self.num_time
+        )
+
+    def __len__(self):
+        return self.total_size // self.batch_time
+
+
 class RecurrentRolloutBuffer(RolloutBuffer):
     """
     Rollout buffer that also stores the RNN states.

@@ -13,7 +13,10 @@ from stable_baselines3.common.buffers import (
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.pytree_dataclass import tree_flatten
-from stable_baselines3.common.recurrent.buffers import RecurrentRolloutBuffer
+from stable_baselines3.common.recurrent.buffers import (
+    RecurrentRolloutBuffer,
+    TimeContiguousBatchesDataset,
+)
 from stable_baselines3.common.recurrent.type_aliases import RecurrentRolloutBufferData
 from stable_baselines3.common.type_aliases import (
     DictReplayBufferSamples,
@@ -199,3 +202,39 @@ def test_device_buffer(replay_buffer_cls, n_envs, device):
                 assert minibatch.old_log_prob.shape == (batch_time, batch_envs)
             else:
                 assert minibatch.old_log_prob.shape == (batch_time,)
+
+
+@pytest.mark.parametrize("num_envs", [1, 3, 4, 5])
+@pytest.mark.parametrize("num_time, batch_time", [(1, 1), (3, 1), (6, 2), (10, 5)])
+@pytest.mark.parametrize("skew_zero", [True, False])
+def test_time_contiguous_batches_dataset(num_envs, num_time, batch_time, skew_zero):
+    num_time_batches = num_time // batch_time
+    if skew_zero:
+        skew = th.zeros(num_envs, dtype=th.long)
+    else:
+        skew = th.arange(1, num_envs + 1, dtype=th.long) % num_time
+
+    d = TimeContiguousBatchesDataset(num_envs=num_envs, num_time=num_time, batch_time=batch_time, skew=skew)
+
+    assert len(d) == num_time_batches * num_envs
+
+    set_all: set[int] = set()
+    for i in range(len(d)):
+        which_time_batch = (i // num_envs) * batch_time
+        which_env = i % num_envs
+        this_skew = skew[which_env].item()
+        this_batch: list[int] = [
+            which_env + num_envs * ((which_time_batch + j + this_skew) % num_time) for j in range(batch_time)
+        ]
+
+        set_all.update(this_batch)
+
+        assert th.equal(d[i], th.as_tensor(this_batch))
+
+    assert set_all == set(range(num_envs * num_time))
+
+    for batch in th.split(th.arange(len(d)), min(len(d), 4)):
+        if len(batch) > 0:
+            individual = th.vstack([d[int(b.item())] for b in batch])
+            collective = d.__getitems__(batch)
+            assert th.equal(individual, collective)

@@ -1,3 +1,4 @@
+import math
 import sys
 import time
 import warnings
@@ -412,6 +413,8 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         # Optional: clip range for the value function
         if self.clip_range_vf is not None:
             clip_range_vf = self.clip_range_vf(self._current_progress_remaining)
+        else:
+            clip_range_vf = math.inf
 
         entropy_losses = []
         pg_losses, value_losses = [], []
@@ -419,6 +422,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         value_diffs_min = []
         value_diffs_max = []
         clip_fractions = []
+        clip_fractions_vf = []
         approx_kl_divs = []
 
         continue_training = True
@@ -478,6 +482,8 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
                     value_diffs_mean.append(value_diff_abs.mean().item())
                     value_diffs_min.append(value_diff_abs.min().item())
                     value_diffs_max.append(value_diff_abs.max().item())
+                    clip_fraction_vf = th.mean((value_diff_abs > clip_range_vf).float()).item()
+                clip_fractions_vf.append(clip_fraction_vf)
 
                 # Entropy loss favor exploration
                 if entropy is None:
@@ -528,6 +534,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         self.logger.record("train/value_diff_max", np.max(value_diffs_max))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
+        self.logger.record("train/clip_fraction", np.mean(clip_fractions_vf))
         self.logger.record("train/loss", loss.item())
         self.logger.record("train/explained_variance", explained_var.item())
         if hasattr(self.policy, "log_std"):

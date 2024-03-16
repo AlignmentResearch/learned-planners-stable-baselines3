@@ -116,8 +116,8 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         clip_range: Union[float, Schedule] = 0.2,
         clip_range_vf: Union[None, float, Schedule] = None,
         normalize_advantage: bool = True,
-        ent_coef: float = 0.0,
-        vf_coef: float = 0.5,
+        ent_coef: Union[float, Schedule] = 0.0,
+        vf_coef: Union[float, Schedule] = 0.5,
         max_grad_norm: Optional[float] = 0.5,
         use_sde: bool = False,
         sde_sample_freq: int = -1,
@@ -137,8 +137,8 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
             n_steps=n_steps,
             gamma=gamma,
             gae_lambda=gae_lambda,
-            ent_coef=ent_coef,
-            vf_coef=vf_coef,
+            ent_coef=ent_coef,  # type: ignore
+            vf_coef=vf_coef,  # type: ignore
             max_grad_norm=max_grad_norm,
             use_sde=use_sde,
             sde_sample_freq=sde_sample_freq,
@@ -269,7 +269,9 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         )
         self._last_lstm_states = tree_map(lambda x: th.zeros_like(x, memory_format=th.contiguous_format), hidden_state_example)
 
-        # Initialize schedules for policy/value clipping
+        # Initialize schedules for policy/value clipping and loss coefficients
+        self.ent_coef = get_schedule_fn(self.ent_coef)
+        self.vf_coef = get_schedule_fn(self.vf_coef)
         self.clip_range = get_schedule_fn(self.clip_range)
         if self.clip_range_vf is not None:
             if isinstance(self.clip_range_vf, (float, int)):
@@ -416,6 +418,9 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         else:
             clip_range_vf = math.inf
 
+        ent_coef = self.ent_coef(self._current_progress_remaining)
+        vf_coef = self.vf_coef(self._current_progress_remaining)
+
         entropy_losses = []
         pg_losses, value_losses = [], []
         value_diffs_mean = []
@@ -494,7 +499,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
 
                 entropy_losses.append(entropy_loss.item())
 
-                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+                loss = policy_loss + ent_coef * entropy_loss + vf_coef * value_loss
 
                 # Calculate approximate form of reverse KL Divergence for early stopping
                 # see issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417

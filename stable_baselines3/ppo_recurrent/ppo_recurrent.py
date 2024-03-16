@@ -270,8 +270,8 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         self._last_lstm_states = tree_map(lambda x: th.zeros_like(x, memory_format=th.contiguous_format), hidden_state_example)
 
         # Initialize schedules for policy/value clipping and loss coefficients
-        self.ent_coef = get_schedule_fn(self.ent_coef)
-        self.vf_coef = get_schedule_fn(self.vf_coef)
+        self.ent_coef = get_schedule_fn(self.ent_coef)  # type: ignore[assignment]
+        self.vf_coef = get_schedule_fn(self.vf_coef)  # type: ignore[assignment]
         self.clip_range = get_schedule_fn(self.clip_range)
         if self.clip_range_vf is not None:
             if isinstance(self.clip_range_vf, (float, int)):
@@ -418,8 +418,8 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         else:
             clip_range_vf = math.inf
 
-        ent_coef = self.ent_coef(self._current_progress_remaining)
-        vf_coef = self.vf_coef(self._current_progress_remaining)
+        ent_coef: float = self.ent_coef(self._current_progress_remaining)  # type: ignore
+        vf_coef: float = self.vf_coef(self._current_progress_remaining)  # type: ignore
 
         entropy_losses = []
         pg_losses, value_losses = [], []

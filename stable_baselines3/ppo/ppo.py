@@ -188,6 +188,9 @@ class PPO(OnPolicyAlgorithm):
         # Optional: clip range for the value function
         clip_range_vf = None if self.clip_range_vf is None else self.clip_range_vf(self._current_progress_remaining)  # type: ignore[operator]
 
+        ent_coef: float = self.ent_coef(self._current_progress_remaining)
+        vf_coef: float = self.vf_coef(self._current_progress_remaining)
+
         entropy_losses = []
         pg_losses, value_losses = [], []
         clip_fractions = []
@@ -262,7 +265,7 @@ class PPO(OnPolicyAlgorithm):
 
                 entropy_losses.append(entropy_loss.item())
 
-                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+                loss = policy_loss + ent_coef * entropy_loss + vf_coef * value_loss
 
                 # Calculate approximate form of reverse KL Divergence for early stopping
                 # see issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
@@ -309,7 +312,7 @@ class PPO(OnPolicyAlgorithm):
 
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
         self.logger.record("train/clip_range", clip_range)
-        if self.clip_range_vf is not None:
+        if clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
 
     def learn(

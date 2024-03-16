@@ -535,7 +535,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
 
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
         self.logger.record("train/clip_range", clip_range)
-        if self.clip_range_vf is not None:
+        if clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
 
     def learn(

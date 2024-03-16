@@ -253,8 +253,9 @@ class PPO(OnPolicyAlgorithm):
                     value_diffs_mean.append(value_diff_abs.mean().item())
                     value_diffs_min.append(value_diff_abs.min().item())
                     value_diffs_max.append(value_diff_abs.max().item())
-                    clip_fraction_vf = th.mean((value_diff_abs > clip_range_vf).float()).item()
-                clip_fractions_vf.append(clip_fraction_vf)
+                    if clip_range_vf is not None:
+                        clip_fraction_vf = th.mean((value_diff_abs > clip_range_vf).float()).item()
+                        clip_fractions_vf.append(clip_fraction_vf)
 
                 # Entropy loss favor exploration
                 if entropy is None:
@@ -304,7 +305,6 @@ class PPO(OnPolicyAlgorithm):
         self.logger.record("train/value_diff_max", np.max(value_diffs_max))
         self.logger.record("train/approx_kl", approx_kl_div)
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
-        self.logger.record("train/clip_fraction_vf", np.mean(clip_fractions_vf))
         self.logger.record("train/loss", loss.item())
         self.logger.record("train/explained_variance", explained_var.item())
         if hasattr(self.policy, "log_std"):
@@ -314,6 +314,7 @@ class PPO(OnPolicyAlgorithm):
         self.logger.record("train/clip_range", clip_range)
         if clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
+            self.logger.record("train/clip_fraction_vf", np.mean(clip_fractions_vf))
 
     def learn(
         self: SelfPPO,

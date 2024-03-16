@@ -73,8 +73,8 @@ class A2C(OnPolicyAlgorithm):
         n_steps: int = 5,
         gamma: float = 0.99,
         gae_lambda: float = 1.0,
-        ent_coef: float = 0.0,
-        vf_coef: float = 0.5,
+        ent_coef: Union[Schedule, float] = 0.0,
+        vf_coef: Union[Schedule, float] = 0.5,
         max_grad_norm: Optional[float] = 0.5,
         rms_prop_eps: float = 1e-5,
         use_rms_prop: bool = True,
@@ -137,6 +137,8 @@ class A2C(OnPolicyAlgorithm):
 
         # Update optimizer learning rate
         self._update_learning_rate(self.policy.optimizer)
+        ent_coef: float = self.ent_coef(self._current_progress_remaining)
+        vf_coef: float = self.vf_coef(self._current_progress_remaining)
 
         # This will only loop once (get all data in one go)
         for rollout_data in self.rollout_buffer.get(batch_size=None):
@@ -166,7 +168,7 @@ class A2C(OnPolicyAlgorithm):
             else:
                 entropy_loss = -th.mean(entropy)
 
-            loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+            loss = policy_loss + ent_coef * entropy_loss + vf_coef * value_loss
 
             # Optimization step
             self.policy.optimizer.zero_grad()

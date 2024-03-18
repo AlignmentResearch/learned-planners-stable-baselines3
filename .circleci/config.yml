@@ -9,7 +9,7 @@ parameters:
   docker_img_version:
     # Docker image version for running tests.
     type: string
-    default: "b4b3a80-main"
+    default: "a0b3407-main"
 
 workflows:
   test-jobs:

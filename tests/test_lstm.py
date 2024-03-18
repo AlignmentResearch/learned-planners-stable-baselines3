@@ -310,7 +310,7 @@ def test_ppo_lstm_performance(policy: str | type[BaseRecurrentActorCriticPolicy]
         batch_envs=N_ENVS,
         batch_time=BATCH_TIME,
         sampling_type=sampling_type,
-        seed=5,
+        seed=6,
         n_epochs=10,
         max_grad_norm=1,
         gae_lambda=0.98,

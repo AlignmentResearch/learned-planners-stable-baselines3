@@ -108,7 +108,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         n_steps: int = 128,
         batch_envs: int = 128,
         batch_time: Optional[int] = None,
-        sampling_type: SamplingType = SamplingType.SKEW_RANDOM,
+        sampling_type: SamplingType = SamplingType.CLASSIC,
         n_epochs: int = 10,
         gamma: float = 0.99,
         gae_lambda: float = 0.95,

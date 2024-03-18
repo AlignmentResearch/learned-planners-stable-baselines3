@@ -305,20 +305,23 @@ def test_ppo_lstm_performance(policy: str | type[BaseRecurrentActorCriticPolicy]
         policy,
         env,
         n_steps=N_STEPS,
-        learning_rate=0.0007,
+        learning_rate=2.5e-4,
         verbose=1,
         batch_envs=N_ENVS,
         batch_time=BATCH_TIME,
         sampling_type=sampling_type,
+        clip_range_vf=0.5,
+        clip_range=0.1,
         seed=6,
         n_epochs=10,
-        max_grad_norm=1,
+        max_grad_norm=0.5,
         gae_lambda=0.98,
         policy_kwargs=dict(
             net_arch=dict(vf=[64], pi=[]),
             ortho_init=False,
             **extra_policy_kwargs,
         ),
+        device="cpu",
     )
 
     model.learn(total_timesteps=100_000, callback=eval_callback)

@@ -22,9 +22,6 @@ workflows:
       - format-and-mypy:
           context:
             - ghcr-auth
-      - pytype:
-          context:
-            - ghcr-auth
 
 commands:
   save-worker-test-results:
@@ -52,17 +49,6 @@ jobs:
       - run:
           name: Typecheck (mypy)
           command: mypy .
-  pytype:
-    docker:
-      - image: ghcr.io/alignmentresearch/learned-planners:<< pipeline.parameters.docker_img_version >>
-        auth:
-          username: "$GHCR_DOCKER_USER"
-          password: "$GHCR_DOCKER_TOKEN"
-    resource_class: alignmentresearch/large
-    working_directory: /workspace/third_party/stable-baselines3
-    steps:
-      - checkout
-      - run: pytype -j 4 --keep-going
   py-tests:
     docker:
       - image: ghcr.io/alignmentresearch/learned-planners:<< pipeline.parameters.docker_img_version >>

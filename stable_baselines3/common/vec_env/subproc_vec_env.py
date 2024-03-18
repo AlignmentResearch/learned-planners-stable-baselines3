@@ -1,7 +1,18 @@
 import multiprocessing as mp
 import warnings
 from collections import OrderedDict
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+    cast,
+)
 
 import gymnasium as gym
 import torch as th
@@ -92,6 +103,8 @@ class SubprocVecEnv(VecEnv):
            Defaults to 'forkserver' on available platforms, and 'spawn' otherwise.
     """
 
+    reset_infos: list[dict[str, Any]]
+
     def __init__(self, env_fns: List[Callable[[], gym.Env]], start_method: Optional[str] = None):
         self.waiting = False
         self.closed = False
@@ -134,7 +147,8 @@ class SubprocVecEnv(VecEnv):
     def step_wait(self) -> VecEnvStepReturn:
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
-        obs, rews, dones, infos, self.reset_infos = zip(*results)
+        infos: list[dict[str, Any]]
+        obs, rews, dones, infos, self.reset_infos = zip(*results)  # type: ignore[assignment]
         return (
             _flatten_obs(obs, self.observation_space),
             th.as_tensor(rews, dtype=th.float32),
@@ -146,7 +160,7 @@ class SubprocVecEnv(VecEnv):
         for env_idx, remote in enumerate(self.remotes):
             remote.send(("reset", self._seeds[env_idx]))
         results = [remote.recv() for remote in self.remotes]
-        obs, self.reset_infos = zip(*results)
+        obs, self.reset_infos = zip(*results)  # type: ignore[assignment]
         # Seeds are only used once
         self._reset_seeds()
         return _flatten_obs(obs, self.observation_space)

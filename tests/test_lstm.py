@@ -15,7 +15,6 @@ from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.envs import FakeImageEnv
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.pytree_dataclass import SB3_NAMESPACE
 from stable_baselines3.common.recurrent.buffers import SamplingType
 from stable_baselines3.common.recurrent.policies import (
     BaseRecurrentActorCriticPolicy,
@@ -26,6 +25,7 @@ from stable_baselines3.common.recurrent.torch_layers import (
     GRUFlattenExtractor,
     GRUNatureCNNExtractor,
 )
+from stable_baselines3.common.type_aliases import SB3_TREE_NAMESPACE
 from stable_baselines3.common.vec_env import VecNormalize
 
 
@@ -259,10 +259,10 @@ def test_steps_to_think_does_something():
     states = model.think_for_n_steps(0, obs, None, some_are_starts)
     new_states = model.think_for_n_steps(0, obs, states, some_are_starts)
 
-    assert tree_all(tree_map(th.equal, states, new_states, namespace=SB3_NAMESPACE), namespace=SB3_NAMESPACE)
+    assert tree_all(tree_map(th.equal, states, new_states, namespace=SB3_TREE_NAMESPACE), namespace=SB3_TREE_NAMESPACE)
 
     new_states = model.think_for_n_steps(4, obs, states, some_are_starts)
-    assert not tree_all(tree_map(th.equal, states, new_states, namespace=SB3_NAMESPACE), namespace=SB3_NAMESPACE)
+    assert not tree_all(tree_map(th.equal, states, new_states, namespace=SB3_TREE_NAMESPACE), namespace=SB3_TREE_NAMESPACE)
 
 
 def test_dict_obs_recurrent_extractor():

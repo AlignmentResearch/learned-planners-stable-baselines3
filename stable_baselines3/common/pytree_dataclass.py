@@ -19,7 +19,7 @@ import torch as th
 from optree import CustomTreeNode, PyTree
 from typing_extensions import dataclass_transform
 
-from stable_baselines3.common.type_aliases import TensorIndex
+from stable_baselines3.common.type_aliases import SB3_TREE_NAMESPACE, TensorIndex
 from stable_baselines3.common.utils import zip_strict
 
 __all__ = [
@@ -34,8 +34,6 @@ __all__ = [
 
 T = TypeVar("T")
 U = TypeVar("U")
-
-SB3_NAMESPACE = "stable-baselines3"
 
 _RESERVED_NAMES = ["_PyTreeDataclassBase", "FrozenPyTreeDataclass", "MutablePyTreeDataclass"]
 
@@ -114,7 +112,7 @@ class _PyTreeDataclassMeta(type(CustomTreeNode)):  # type: ignore[misc]
             cls = dataclasses.dataclass(frozen=frozen, slots=slots, **kwargs)(cls)
 
             assert issubclass(cls, CustomTreeNode)
-            ot.register_pytree_node_class(cls, namespace=SB3_NAMESPACE)
+            ot.register_pytree_node_class(cls, namespace=SB3_TREE_NAMESPACE)
         return cls
 
 
@@ -179,12 +177,14 @@ else:
 @dataclass_transform(frozen_default=True)  # pytype: disable=not-supported-yet
 class FrozenPyTreeDataclass(_PyTreeDataclassBase[T], Generic[T], frozen=True):
     "Abstract class for immutable dataclass PyTrees"
+
     ...
 
 
 @dataclass_transform(frozen_default=False)  # pytype: disable=not-supported-yet
 class MutablePyTreeDataclass(_PyTreeDataclassBase[T], Generic[T], frozen=False):
     "Abstract class for mutable dataclass PyTrees"
+
     ...
 
 
@@ -211,7 +211,7 @@ def tree_flatten(
     is_leaf: Callable[[TensorTree], bool] | None = None,
     *,
     none_is_leaf: bool = False,
-    namespace: str = SB3_NAMESPACE,
+    namespace: str = SB3_TREE_NAMESPACE,
 ) -> tuple[list[th.Tensor], ot.PyTreeSpec]:
     ...
 
@@ -222,14 +222,14 @@ def tree_flatten(
     is_leaf: Callable[[T], bool] | None = None,
     *,
     none_is_leaf: bool = False,
-    namespace: str = SB3_NAMESPACE,
+    namespace: str = SB3_TREE_NAMESPACE,
 ) -> tuple[list[T], ot.PyTreeSpec]:
     ...
 
 
-def tree_flatten(tree, is_leaf=None, *, none_is_leaf=False, namespace=SB3_NAMESPACE):
+def tree_flatten(tree, is_leaf=None, *, none_is_leaf=False, namespace=SB3_TREE_NAMESPACE):
     """
-    Flattens the PyTree (see `optree.tree_flatten`), expanding nodes using the SB3_NAMESPACE by default.
+    Flattens the PyTree (see `optree.tree_flatten`), expanding nodes using the SB3_TREE_NAMESPACE by default.
     """
     return ot.tree_flatten(tree, is_leaf, none_is_leaf=none_is_leaf, namespace=namespace)
 
@@ -241,7 +241,7 @@ def tree_map(
     *rests: TensorTree,
     is_leaf: Callable[[TensorTree], bool] | None = None,
     none_is_leaf: bool = False,
-    namespace: str = SB3_NAMESPACE,
+    namespace: str = SB3_TREE_NAMESPACE,
 ) -> ConcreteTensorTree:
     ...
 
@@ -259,16 +259,20 @@ def tree_map(
     ...
 
 
-def tree_map(func, tree, *rests, is_leaf=None, none_is_leaf=False, namespace=SB3_NAMESPACE):  # type: ignore
+def tree_map(func, tree, *rests, is_leaf=None, none_is_leaf=False, namespace=SB3_TREE_NAMESPACE):  # type: ignore
     """
     Maps a function over a PyTree (see `optree.tree_map`), over the trees in `tree` and `*rests`, expanding nodes using
-    the SB3_NAMESPACE by default.
+    the SB3_TREE_NAMESPACE by default.
     """
     return ot.tree_map(func, tree, *rests, is_leaf=is_leaf, none_is_leaf=none_is_leaf, namespace=namespace)
 
 
 def tree_empty(
-    tree: ot.PyTree, *, is_leaf: Callable[[T], bool] | None = None, none_is_leaf: bool = False, namespace: str = SB3_NAMESPACE
+    tree: ot.PyTree,
+    *,
+    is_leaf: Callable[[T], bool] | None = None,
+    none_is_leaf: bool = False,
+    namespace: str = SB3_TREE_NAMESPACE,
 ) -> bool:
     """Is the tree `tree` empty, i.e. without leaves?
 
@@ -286,7 +290,7 @@ def tree_index(
     *,
     is_leaf: None | Callable[[TensorTree], bool] = None,
     none_is_leaf: bool = False,
-    namespace: str = SB3_NAMESPACE,
+    namespace: str = SB3_TREE_NAMESPACE,
 ) -> ConcreteTensorTree:
     """
     Index each leaf of a PyTree of Tensors using the index `idx`.

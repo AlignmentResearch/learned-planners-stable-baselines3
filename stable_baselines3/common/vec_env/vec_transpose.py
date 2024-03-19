@@ -106,11 +106,11 @@ class VecTransposeImage(VecEnvWrapper):
         assert isinstance(observations, (th.Tensor, dict))
         return self.transpose_observations(observations), rewards, dones, infos
 
-    def reset(self) -> Union[th.Tensor, Dict]:
+    def reset(self, **kwargs) -> Union[th.Tensor, Dict]:
         """
         Reset all environments
         """
-        observations = self.venv.reset()
+        observations = self.venv.reset(**kwargs)
         assert isinstance(observations, (th.Tensor, dict))
         return self.transpose_observations(observations)
 

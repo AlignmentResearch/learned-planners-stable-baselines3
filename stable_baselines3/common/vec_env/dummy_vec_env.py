@@ -74,9 +74,9 @@ class DummyVecEnv(VecEnv):
             self._save_obs(env_idx, obs)
         return (self._obs_from_buf(), self.buf_rews.clone(), self.buf_dones.clone(), deepcopy(self.buf_infos))
 
-    def reset(self) -> VecEnvObs:
+    def reset(self, **kwargs) -> VecEnvObs:
         for env_idx in range(self.num_envs):
-            obs, self.reset_infos[env_idx] = self.envs[env_idx].reset(seed=self._seeds[env_idx])
+            obs, self.reset_infos[env_idx] = self.envs[env_idx].reset(seed=self._seeds[env_idx], **kwargs)
             obs = obs_as_tensor(obs, self.device)
             self._save_obs(env_idx, obs)
         # Seeds are only used once

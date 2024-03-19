@@ -1,3 +1,4 @@
+import math
 import sys
 import time
 import warnings
@@ -413,10 +414,16 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         # Optional: clip range for the value function
         if self.clip_range_vf is not None:
             clip_range_vf = self.clip_range_vf(self._current_progress_remaining)
+        else:
+            clip_range_vf = math.inf
 
         entropy_losses = []
         pg_losses, value_losses = [], []
+        value_diffs_mean = []
+        value_diffs_min = []
+        value_diffs_max = []
         clip_fractions = []
+        clip_fractions_vf = []
         approx_kl_divs = []
 
         continue_training = True
@@ -460,18 +467,24 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
                     clip_fraction = th.mean((th.abs(ratio - 1) > clip_range).float()).item()
                 clip_fractions.append(clip_fraction)
 
+                value_diff = values - rollout_data.old_values
                 if self.clip_range_vf is None:
                     # No clipping
                     values_pred = values
                 else:
                     # Clip the difference between old and new value
                     # NOTE: this depends on the reward scaling
-                    values_pred = rollout_data.old_values + th.clamp(
-                        values - rollout_data.old_values, -clip_range_vf, clip_range_vf
-                    )
+                    values_pred = rollout_data.old_values + th.clamp(value_diff, -clip_range_vf, clip_range_vf)
                 # Value loss using the TD(gae_lambda) target
                 value_loss = F.mse_loss(rollout_data.returns, values_pred)
                 value_losses.append(value_loss.item())
+                with th.no_grad():
+                    value_diff_abs = value_diff.abs()
+                    value_diffs_mean.append(value_diff_abs.mean().item())
+                    value_diffs_min.append(value_diff_abs.min().item())
+                    value_diffs_max.append(value_diff_abs.max().item())
+                    clip_fraction_vf = th.mean((value_diff_abs > clip_range_vf).float()).item()
+                clip_fractions_vf.append(clip_fraction_vf)
 
                 # Entropy loss favor exploration
                 if entropy is None:
@@ -517,8 +530,12 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         self.logger.record("train/entropy_loss", np.mean(entropy_losses))
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
+        self.logger.record("train/value_diff_mean", np.mean(value_diffs_mean))
+        self.logger.record("train/value_diff_min", np.min(value_diffs_min))
+        self.logger.record("train/value_diff_max", np.max(value_diffs_max))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
+        self.logger.record("train/clip_fraction", np.mean(clip_fractions_vf))
         self.logger.record("train/loss", loss.item())
         self.logger.record("train/explained_variance", explained_var.item())
         if hasattr(self.policy, "log_std"):

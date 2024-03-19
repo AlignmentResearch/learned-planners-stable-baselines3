@@ -370,7 +370,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
                         terminal_value = self.policy.predict_values(terminal_obs, terminal_lstm_state, episode_starts)[
                             0
                         ].squeeze()
-                    rewards[idx] += self.gamma * terminal_value
+                    rewards[idx] += self.gamma * terminal_value.to(device=rewards.device)
 
             rollout_buffer.add(
                 RecurrentRolloutBufferData(

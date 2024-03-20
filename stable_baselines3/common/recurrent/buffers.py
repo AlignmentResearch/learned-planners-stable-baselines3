@@ -76,8 +76,9 @@ class TimeContiguousBatchesDataset:
 
 
 class SamplingType(enum.Enum):
-    CLASSIC = 0
-    SKEW_ZEROS = 1
+    CLASSIC = 0  # for each training epoch, randomize the environment order and go sequentially through time.
+    SKEW_ZEROS = 1  # Pick random environments and time-slices. All the time-slices are aligned.
+    # Pick random environments and time-slices, which are skewed a random amount compared to the start of the buffer.
     SKEW_RANDOM = 2
 
 

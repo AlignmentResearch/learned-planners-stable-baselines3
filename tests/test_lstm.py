@@ -15,7 +15,6 @@ from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.envs import FakeImageEnv
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.pytree_dataclass import SB3_NAMESPACE
 from stable_baselines3.common.recurrent.buffers import SamplingType
 from stable_baselines3.common.recurrent.policies import (
     BaseRecurrentActorCriticPolicy,
@@ -26,6 +25,7 @@ from stable_baselines3.common.recurrent.torch_layers import (
     GRUFlattenExtractor,
     GRUNatureCNNExtractor,
 )
+from stable_baselines3.common.type_aliases import SB3_TREE_NAMESPACE
 from stable_baselines3.common.vec_env import VecNormalize
 
 
@@ -259,10 +259,10 @@ def test_steps_to_think_does_something():
     states = model.think_for_n_steps(0, obs, None, some_are_starts)
     new_states = model.think_for_n_steps(0, obs, states, some_are_starts)
 
-    assert tree_all(tree_map(th.equal, states, new_states, namespace=SB3_NAMESPACE), namespace=SB3_NAMESPACE)
+    assert tree_all(tree_map(th.equal, states, new_states, namespace=SB3_TREE_NAMESPACE), namespace=SB3_TREE_NAMESPACE)
 
     new_states = model.think_for_n_steps(4, obs, states, some_are_starts)
-    assert not tree_all(tree_map(th.equal, states, new_states, namespace=SB3_NAMESPACE), namespace=SB3_NAMESPACE)
+    assert not tree_all(tree_map(th.equal, states, new_states, namespace=SB3_TREE_NAMESPACE), namespace=SB3_TREE_NAMESPACE)
 
 
 def test_dict_obs_recurrent_extractor():
@@ -305,20 +305,23 @@ def test_ppo_lstm_performance(policy: str | type[BaseRecurrentActorCriticPolicy]
         policy,
         env,
         n_steps=N_STEPS,
-        learning_rate=0.0007,
+        learning_rate=2.5e-4,
         verbose=1,
         batch_envs=N_ENVS,
         batch_time=BATCH_TIME,
         sampling_type=sampling_type,
+        clip_range_vf=0.5,
+        clip_range=0.1,
         seed=6,
         n_epochs=10,
-        max_grad_norm=1,
+        max_grad_norm=0.5,
         gae_lambda=0.98,
         policy_kwargs=dict(
             net_arch=dict(vf=[64], pi=[]),
             ortho_init=False,
             **extra_policy_kwargs,
         ),
+        device="cpu",
     )
 
     model.learn(total_timesteps=100_000, callback=eval_callback)

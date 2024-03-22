@@ -108,7 +108,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         n_steps: int = 128,
         batch_envs: int = 128,
         batch_time: Optional[int] = None,
-        sampling_type: SamplingType = SamplingType.SKEW_RANDOM,
+        sampling_type: SamplingType = SamplingType.CLASSIC,
         n_epochs: int = 10,
         gamma: float = 0.99,
         gae_lambda: float = 0.95,
@@ -325,6 +325,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
                 obs_tensor = obs_as_tensor(self._last_obs, self.device)
                 episode_starts = non_null(self._last_episode_starts)
                 actions, values, log_probs, lstm_states = self.policy.forward(obs_tensor, lstm_states, episode_starts)
+                lstm_states = tree_map(th.clone, lstm_states)
 
             # Rescale and perform action
             clipped_actions = actions
@@ -369,7 +370,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
                         terminal_value = self.policy.predict_values(terminal_obs, terminal_lstm_state, episode_starts)[
                             0
                         ].squeeze()
-                    rewards[idx] += self.gamma * terminal_value
+                    rewards[idx] += self.gamma * terminal_value.to(device=rewards.device)
 
             rollout_buffer.add(
                 RecurrentRolloutBufferData(
@@ -435,7 +436,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
                 values, log_prob, entropy = self.policy.evaluate_actions(
                     rollout_data.observations,  # type: ignore[arg-type]
                     actions,
-                    rollout_data.hidden_states,  # type: ignore[arg-type]
+                    tree_map(th.clone, rollout_data.hidden_states),  # type: ignore[arg-type]
                     rollout_data.episode_starts,
                 )
 

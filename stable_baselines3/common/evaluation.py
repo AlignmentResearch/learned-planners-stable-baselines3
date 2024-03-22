@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import gymnasium as gym
 import numpy as np
 import torch as th
+from optree import tree_map
 
 from stable_baselines3.common import type_aliases
 from stable_baselines3.common.vec_env import (
@@ -94,7 +95,7 @@ def evaluate_policy(
     # Divides episodes among different sub environments in the vector as evenly as possible
     episode_count_targets = th.tensor([(n_eval_episodes + i) // n_envs for i in range(n_envs)], dtype=th.int64, device="cpu")
 
-    states = None
+    states: tuple[th.Tensor, ...] | None = None
     current_rewards = th.zeros(n_envs, dtype=th.float32, device="cpu")
     current_lengths = th.zeros(n_envs, dtype=th.int64, device="cpu")
     episode_starts = th.ones((env.num_envs,), dtype=th.bool, device=model.device)
@@ -105,12 +106,14 @@ def evaluate_policy(
             else:
                 if n_steps_to_think > 0:
                     raise TypeError(f"Policy {model} cannot think for longer than 0 steps.")
+
             actions, states = model.predict(
                 observations,  # type: ignore[arg-type]
                 state=states,
                 episode_start=episode_starts,
                 deterministic=deterministic,
             )
+            states = tree_map(th.clone, states, namespace=type_aliases.SB3_TREE_NAMESPACE, none_is_leaf=False)  # type: ignore
         new_observations, rewards, dones, infos = env.step(actions)
         current_rewards += rewards.to(current_rewards)
         current_lengths += 1

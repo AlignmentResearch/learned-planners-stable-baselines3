@@ -12,7 +12,10 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.pytree_dataclass import tree_index, tree_map
-from stable_baselines3.common.recurrent.buffers import RecurrentRolloutBuffer
+from stable_baselines3.common.recurrent.buffers import (
+    RecurrentRolloutBuffer,
+    SamplingType,
+)
 from stable_baselines3.common.recurrent.policies import BaseRecurrentActorCriticPolicy
 from stable_baselines3.common.recurrent.torch_layers import RecurrentState
 from stable_baselines3.common.recurrent.type_aliases import RecurrentRolloutBufferData
@@ -105,6 +108,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         n_steps: int = 128,
         batch_envs: int = 128,
         batch_time: Optional[int] = None,
+        sampling_type: SamplingType = SamplingType.CLASSIC,
         n_epochs: int = 10,
         gamma: float = 0.99,
         gae_lambda: float = 0.95,
@@ -153,6 +157,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         )
         if batch_time is None:
             batch_time = self.n_steps
+        self.sampling_type = sampling_type
         # Sanity check, otherwise it will lead to noisy gradient and NaN
         # because of the advantage normalization
         if normalize_advantage:
@@ -259,6 +264,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
             gamma=self.gamma,
             gae_lambda=self.gae_lambda,
             n_envs=self.n_envs,
+            sampling_type=self.sampling_type,
         )
         self._last_lstm_states = tree_map(lambda x: th.zeros_like(x, memory_format=th.contiguous_format), hidden_state_example)
 

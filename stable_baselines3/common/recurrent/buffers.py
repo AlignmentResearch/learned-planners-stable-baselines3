@@ -1,4 +1,6 @@
 import dataclasses
+import enum
+import functools
 import logging
 from typing import Generator, Optional, Tuple, Union
 
@@ -39,6 +41,47 @@ def space_to_example(
     return tree_map(_zeros_with_batch, space.sample())
 
 
+class TimeContiguousBatchesDataset:
+    def __init__(self, num_envs: int, num_time: int, batch_time: int, skew: th.Tensor, device: th.device):
+        assert batch_time > 0 and num_envs > 0 and num_time > 0
+        assert num_time >= batch_time
+        assert num_time % batch_time == 0
+        assert skew.shape == (num_envs,)
+        assert th.all(skew < num_time)
+
+        self.num_envs = num_envs
+        self.num_time = num_time
+        self.batch_time = batch_time
+        self.skew = skew
+
+        self._arange_time = th.arange(self.batch_time, device=device).unsqueeze(1)
+
+    def __getitem__(self, index: int) -> th.Tensor:
+        which_env = index % self.num_envs
+        which_time_batch = (index // self.num_envs) * self.batch_time
+        skew = self.skew[which_env]
+        return which_env + self.num_envs * ((which_time_batch + skew + self._arange_time.squeeze(1)) % self.num_time)
+
+    def get_batch_and_init_times(self, indices: th.Tensor) -> tuple[tuple[th.Tensor, th.Tensor], th.Tensor]:
+        which_env = indices % self.num_envs
+        which_time_batch = (indices // self.num_envs) * self.batch_time
+        skew = self.skew[which_env]
+
+        overall_idx = which_env + self.num_envs * (((which_time_batch + skew) + self._arange_time) % self.num_time)
+        first_idx = overall_idx[0, :]
+        return ((first_idx // self.num_envs, first_idx % self.num_envs), overall_idx)
+
+    def __len__(self):
+        return self.num_envs * self.num_time // self.batch_time
+
+
+class SamplingType(enum.Enum):
+    CLASSIC = 0  # for each training epoch, randomize the environment order and go sequentially through time.
+    SKEW_ZEROS = 1  # Pick random environments and time-slices. All the time-slices are aligned.
+    # Pick random environments and time-slices, which are skewed a random amount compared to the start of the buffer.
+    SKEW_RANDOM = 2
+
+
 class RecurrentRolloutBuffer(RolloutBuffer):
     """
     Rollout buffer that also stores the RNN states.
@@ -64,11 +107,13 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         gae_lambda: float = 1,
         gamma: float = 0.99,
         n_envs: int = 1,
+        sampling_type: SamplingType = SamplingType.CLASSIC,
     ):
         super(RolloutBuffer, self).__init__(buffer_size, observation_space, action_space, device=device, n_envs=n_envs)
         self.hidden_state_example = hidden_state_example
         self.gae_lambda = gae_lambda
         self.gamma = gamma
+        self.sampling_type = sampling_type
 
         batch_shape = (self.buffer_size, self.n_envs)
         self.device = device = get_device(device)
@@ -154,18 +199,51 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         batch_envs: int,
     ) -> Generator[RecurrentRolloutBufferSamples, None, None]:
         assert self.full, "Rollout buffer must be full before sampling from it"
-        if batch_envs >= self.n_envs:
-            for time_start in range(0, self.buffer_size, batch_time):
-                yield self._get_samples(seq_inds=slice(time_start, time_start + batch_time), batch_inds=slice(None))
-
-        else:
-            env_indices = th.randperm(self.n_envs)
-            for env_start in range(0, self.n_envs, batch_envs):
+        if self.sampling_type == SamplingType.CLASSIC:
+            if batch_envs >= self.n_envs:
                 for time_start in range(0, self.buffer_size, batch_time):
-                    yield self._get_samples(
-                        seq_inds=slice(time_start, time_start + batch_time),
-                        batch_inds=env_indices[env_start : env_start + batch_envs],
-                    )
+                    yield self._get_samples(seq_inds=slice(time_start, time_start + batch_time), batch_inds=slice(None))
+
+            else:
+                env_indices = th.randperm(self.n_envs)
+                for env_start in range(0, self.n_envs, batch_envs):
+                    for time_start in range(0, self.buffer_size, batch_time):
+                        yield self._get_samples(
+                            seq_inds=slice(time_start, time_start + batch_time),
+                            batch_inds=env_indices[env_start : env_start + batch_envs],
+                        )
+        else:
+            if self.sampling_type == SamplingType.SKEW_ZEROS:
+                skew = th.zeros(self.n_envs, dtype=th.long, device=self.device)
+            elif self.sampling_type == SamplingType.SKEW_RANDOM:
+                skew = th.randint(0, self.buffer_size, size=(self.n_envs,), dtype=th.long, device=self.device)
+            else:
+                raise ValueError(f"unknown SkewEnum {self.sampling_type=}")
+
+            dset = TimeContiguousBatchesDataset(self.n_envs, self.buffer_size, batch_time, skew, device=self.device)
+            batch_indices = th.randperm(len(dset), dtype=th.long, device=self.device)
+
+            def _index_first_shape(idx, x):
+                return x.view(x.shape[0] * x.shape[1], *x.shape[2:])[idx]
+
+            def _index_first_time(first_time_idx, first_env_idx, x):
+                return x[first_time_idx, slice(None), first_env_idx].moveaxis(0, 1)
+
+            for i in range(0, len(batch_indices), batch_envs):
+                (first_time_idx, first_env_idx), idx = dset.get_batch_and_init_times(batch_indices[i : i + batch_envs])
+                idx_fn = functools.partial(_index_first_shape, idx)
+                yield RecurrentRolloutBufferSamples(
+                    observations=tree_map(idx_fn, self.data.observations),
+                    actions=idx_fn(self.data.actions),
+                    old_values=idx_fn(self.data.values),
+                    old_log_prob=idx_fn(self.data.log_probs),
+                    advantages=idx_fn(self.advantages),
+                    returns=idx_fn(self.returns),
+                    hidden_states=tree_map(
+                        functools.partial(_index_first_time, first_time_idx, first_env_idx), self.data.hidden_states
+                    ),
+                    episode_starts=idx_fn(self.data.episode_starts),
+                )
 
     def _get_samples(  # type: ignore[override]
         self,

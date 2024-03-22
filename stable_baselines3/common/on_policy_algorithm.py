@@ -9,12 +9,8 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.policies import ActorCriticPolicy
-from stable_baselines3.common.type_aliases import (
-    GymEnv,
-    MaybeCallback,
-    Schedule,
-)
-from stable_baselines3.common.utils import safe_mean
+from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
+from stable_baselines3.common.utils import get_schedule_fn, safe_mean
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.vec_env.util import obs_as_tensor
 
@@ -59,6 +55,8 @@ class OnPolicyAlgorithm(BaseAlgorithm):
     rollout_buffer: RolloutBuffer
     policy: ActorCriticPolicy
     policy_class: Type[ActorCriticPolicy]
+    ent_coef: Schedule
+    vf_coef: Schedule
 
     def __init__(
         self,
@@ -68,8 +66,8 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         n_steps: int,
         gamma: float,
         gae_lambda: float,
-        ent_coef: float,
-        vf_coef: float,
+        ent_coef: Union[float, Schedule],
+        vf_coef: Union[float, Schedule],
         max_grad_norm: Optional[float],
         use_sde: bool,
         sde_sample_freq: int,
@@ -102,8 +100,8 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         self.n_steps = n_steps
         self.gamma = gamma
         self.gae_lambda = gae_lambda
-        self.ent_coef = ent_coef
-        self.vf_coef = vf_coef
+        self.ent_coef = get_schedule_fn(ent_coef)
+        self.vf_coef = get_schedule_fn(vf_coef)
         self.max_grad_norm = max_grad_norm
 
         if _init_setup_model:

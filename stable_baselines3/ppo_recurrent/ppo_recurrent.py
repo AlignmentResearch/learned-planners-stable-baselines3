@@ -12,7 +12,10 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.pytree_dataclass import tree_index, tree_map
-from stable_baselines3.common.recurrent.buffers import RecurrentRolloutBuffer
+from stable_baselines3.common.recurrent.buffers import (
+    RecurrentRolloutBuffer,
+    SamplingType,
+)
 from stable_baselines3.common.recurrent.policies import BaseRecurrentActorCriticPolicy
 from stable_baselines3.common.recurrent.torch_layers import RecurrentState
 from stable_baselines3.common.recurrent.type_aliases import RecurrentRolloutBufferData
@@ -107,6 +110,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         n_steps: int = 128,
         batch_envs: int = 128,
         batch_time: Optional[int] = None,
+        sampling_type: SamplingType = SamplingType.CLASSIC,
         n_epochs: int = 10,
         gamma: float = 0.99,
         gae_lambda: float = 0.95,
@@ -155,6 +159,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         )
         if batch_time is None:
             batch_time = self.n_steps
+        self.sampling_type = sampling_type
         # Sanity check, otherwise it will lead to noisy gradient and NaN
         # because of the advantage normalization
         if normalize_advantage:
@@ -266,6 +271,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
             gamma=self.gamma,
             gae_lambda=self.gae_lambda,
             n_envs=self.n_envs,
+            sampling_type=self.sampling_type,
         )
         self._last_lstm_states = tree_map(lambda x: th.zeros_like(x, memory_format=th.contiguous_format), hidden_state_example)
 
@@ -318,6 +324,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
                 obs_tensor = obs_as_tensor(self._last_obs, self.device)
                 episode_starts = non_null(self._last_episode_starts)
                 actions, values, log_probs, lstm_states = self.policy.forward(obs_tensor, lstm_states, episode_starts)
+                lstm_states = tree_map(th.clone, lstm_states)
 
             # Rescale and perform action
             clipped_actions = actions
@@ -362,7 +369,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
                         terminal_value = self.policy.predict_values(terminal_obs, terminal_lstm_state, episode_starts)[
                             0
                         ].squeeze()
-                    rewards[idx] += self.gamma * terminal_value
+                    rewards[idx] += self.gamma * terminal_value.to(device=rewards.device)
 
             rollout_buffer.add(
                 RecurrentRolloutBufferData(
@@ -434,7 +441,7 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
                 values, log_prob, entropy = self.policy.evaluate_actions(
                     rollout_data.observations,  # type: ignore[arg-type]
                     actions,
-                    rollout_data.hidden_states,  # type: ignore[arg-type]
+                    tree_map(th.clone, rollout_data.hidden_states),  # type: ignore[arg-type]
                     rollout_data.episode_starts,
                 )
 

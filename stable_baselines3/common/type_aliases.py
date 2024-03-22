@@ -24,6 +24,9 @@ import torch as th
 
 from stable_baselines3.common import callbacks, vec_env
 
+SB3_TREE_NAMESPACE: str = "stable-baselines3"
+
+
 GymEnv = Union[gym.Env, vec_env.VecEnv]
 GymObs = Union[Tuple["GymObs", ...], Dict[str, "GymObs"], np.ndarray, int]
 TensorDict = Dict[str, th.Tensor]

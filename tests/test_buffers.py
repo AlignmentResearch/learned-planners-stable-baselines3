@@ -13,7 +13,11 @@ from stable_baselines3.common.buffers import (
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.pytree_dataclass import tree_flatten
-from stable_baselines3.common.recurrent.buffers import RecurrentRolloutBuffer
+from stable_baselines3.common.recurrent.buffers import (
+    RecurrentRolloutBuffer,
+    SamplingType,
+    TimeContiguousBatchesDataset,
+)
 from stable_baselines3.common.recurrent.type_aliases import RecurrentRolloutBufferData
 from stable_baselines3.common.type_aliases import (
     DictReplayBufferSamples,
@@ -125,11 +129,20 @@ HIDDEN_STATES_EXAMPLE = {"a": {"b": th.zeros(2, 4)}}
 
 
 @pytest.mark.parametrize(
-    "replay_buffer_cls", [DictReplayBuffer, DictRolloutBuffer, ReplayBuffer, RolloutBuffer, RecurrentRolloutBuffer]
+    "replay_buffer_cls, sampling_type",
+    [
+        (DictReplayBuffer, None),
+        (DictRolloutBuffer, None),
+        (ReplayBuffer, None),
+        (RolloutBuffer, None),
+        (RecurrentRolloutBuffer, SamplingType.CLASSIC),
+        (RecurrentRolloutBuffer, SamplingType.SKEW_ZEROS),
+        (RecurrentRolloutBuffer, SamplingType.SKEW_RANDOM),
+    ],
 )
 @pytest.mark.parametrize("n_envs", [1, 4])
 @pytest.mark.parametrize("device", ["cpu", "cuda", "auto"])
-def test_device_buffer(replay_buffer_cls, n_envs, device):
+def test_device_buffer(replay_buffer_cls, sampling_type, n_envs, device):
     if device == "cuda" and not th.cuda.is_available():
         pytest.skip("CUDA not available")
 
@@ -152,6 +165,7 @@ def test_device_buffer(replay_buffer_cls, n_envs, device):
             hidden_state_example=N_ENVS_HIDDEN_STATES,
             device=device,
             n_envs=n_envs,
+            sampling_type=sampling_type,
         )
     else:
         buffer = replay_buffer_cls(EP_LENGTH, env.observation_space, env.action_space, device=device, n_envs=n_envs)
@@ -199,3 +213,43 @@ def test_device_buffer(replay_buffer_cls, n_envs, device):
                 assert minibatch.old_log_prob.shape == (batch_time, batch_envs)
             else:
                 assert minibatch.old_log_prob.shape == (batch_time,)
+
+
+@pytest.mark.parametrize("num_envs", [1, 3, 4, 5])
+@pytest.mark.parametrize("num_time, batch_time", [(1, 1), (3, 1), (6, 2), (10, 5)])
+@pytest.mark.parametrize("skew_zero", [True, False])
+def test_time_contiguous_batches_dataset(num_envs, num_time, batch_time, skew_zero):
+    num_time_batches = num_time // batch_time
+    if skew_zero:
+        skew = th.zeros(num_envs, dtype=th.long)
+    else:
+        skew = th.arange(1, num_envs + 1, dtype=th.long) % num_time
+
+    d = TimeContiguousBatchesDataset(
+        num_envs=num_envs, num_time=num_time, batch_time=batch_time, skew=skew, device=th.device("cpu")
+    )
+
+    assert len(d) == num_time_batches * num_envs
+
+    set_all: set[int] = set()
+    for i in range(len(d)):
+        which_time_batch = (i // num_envs) * batch_time
+        which_env = i % num_envs
+        this_skew = skew[which_env].item()
+        this_batch: list[int] = [
+            which_env + num_envs * ((which_time_batch + j + this_skew) % num_time) for j in range(batch_time)
+        ]
+
+        set_all.update(this_batch)
+
+        assert th.equal(d[i], th.as_tensor(this_batch))
+
+    assert set_all == set(range(num_envs * num_time))
+
+    for batch in th.split(th.arange(len(d)), min(len(d), 4)):
+        if len(batch) > 0:
+            individual = th.vstack([d[int(b.item())] for b in batch]).T
+            (first_time, first_envs), collective = d.get_batch_and_init_times(batch)
+            assert th.equal(individual, collective)
+
+            assert th.equal(first_time * num_envs + first_envs, collective[0])

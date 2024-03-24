@@ -110,7 +110,7 @@ class VecEnv(ABC):
         self._seeds = [None for _ in range(self.num_envs)]
 
     @abstractmethod
-    def reset(self) -> VecEnvObs:
+    def reset(self, options=None) -> VecEnvObs:
         """
         Reset all the environments and return an array of
         observations, or a tuple of observation arrays.
@@ -363,7 +363,7 @@ class VecEnvWrapper(VecEnv):
         return self.venv.device
 
     @abstractmethod
-    def reset(self) -> VecEnvObs:
+    def reset(self, options=None) -> VecEnvObs:
         pass
 
     @abstractmethod

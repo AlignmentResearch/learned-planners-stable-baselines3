@@ -110,7 +110,10 @@ class VecTransposeImage(VecEnvWrapper):
         """
         Reset all environments
         """
-        observations = self.venv.reset(options=options)
+        if options is None:
+            observations = self.venv.reset()
+        else:
+            observations = self.venv.reset(options=options)
         assert isinstance(observations, (th.Tensor, dict))
         return self.transpose_observations(observations)
 

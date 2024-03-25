@@ -156,9 +156,12 @@ class SubprocVecEnv(VecEnv):
             infos,
         )
 
-    def reset(self, options=None) -> VecEnvObs:
+    def reset(self, options: Optional[Dict[str, Any]] = None) -> VecEnvObs:
         for env_idx, remote in enumerate(self.remotes):
-            remote.send(("reset", (self._seeds[env_idx], options)))
+            if options is None:
+                remote.send(("reset", (self._seeds[env_idx])))
+            else:
+                remote.send(("reset", (self._seeds[env_idx], options)))
         results = [remote.recv() for remote in self.remotes]
         obs, self.reset_infos = zip(*results)  # type: ignore[assignment]
         # Seeds are only used once

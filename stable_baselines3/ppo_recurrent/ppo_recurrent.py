@@ -42,6 +42,16 @@ from stable_baselines3.ppo_recurrent.policies import (
 SelfRecurrentPPO = TypeVar("SelfRecurrentPPO", bound="RecurrentPPO")
 
 
+class ClampPreserveGradient(th.autograd.Function):
+    @staticmethod
+    def forward(ctx, input, clamp_min, clamp_max):
+        return input.clamp(clamp_min, clamp_max)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output, None, None
+
+
 class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
     """
     Proximal Policy Optimization algorithm (PPO) (clip version)
@@ -120,6 +130,8 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         ent_coef: Union[float, Schedule] = 0.0,
         vf_coef: Union[float, Schedule] = 0.5,
         max_grad_norm: Optional[float] = 0.5,
+        clamp_gradient_policy: bool = True,
+        clamp_gradient_value: bool = True,
         use_sde: bool = False,
         sde_sample_freq: int = -1,
         target_kl: Optional[float] = None,
@@ -200,6 +212,8 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
         self.batch_envs = batch_envs
         self.batch_time = batch_time
         self.n_epochs = n_epochs
+        self.clamp_gradient_policy = clamp_gradient_policy
+        self.clamp_gradient_value = clamp_gradient_value
         self.clip_range = get_schedule_fn(clip_range)
         if clip_range_vf is not None:
             if isinstance(clip_range_vf, (float, int)):
@@ -456,7 +470,10 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
 
                 # clipped surrogate loss
                 policy_loss_1 = advantages * ratio
-                policy_loss_2 = advantages * th.clamp(ratio, 1 - clip_range, 1 + clip_range)
+                if self.clamp_gradient_policy:
+                    policy_loss_2 = advantages * ClampPreserveGradient.apply(ratio, 1 - clip_range, 1 + clip_range)
+                else:
+                    policy_loss_2 = advantages * th.clamp(ratio, 1 - clip_range, 1 + clip_range)
                 policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
 
                 # Logging
@@ -474,7 +491,12 @@ class RecurrentPPO(OnPolicyAlgorithm, Generic[RecurrentState]):
                     # Clip the difference between old and new value
                     # NOTE: this depends on the reward scaling
                     value_diff = values - rollout_data.old_values
-                    values_pred = rollout_data.old_values + th.clamp(value_diff, -clip_range_vf, clip_range_vf)
+                    if self.clamp_gradient_value:
+                        values_pred = rollout_data.old_values + ClampPreserveGradient.apply(
+                            value_diff, -clip_range_vf, clip_range_vf
+                        )
+                    else:
+                        values_pred = rollout_data.old_values + th.clamp(value_diff, -clip_range_vf, clip_range_vf)
                 # Value loss using the TD(gae_lambda) target
                 value_loss = F.mse_loss(rollout_data.returns, values_pred)
                 value_losses.append(value_loss.item())

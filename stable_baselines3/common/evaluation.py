@@ -115,6 +115,7 @@ def evaluate_policy(
             )
             states = tree_map(th.clone, states, namespace=type_aliases.SB3_TREE_NAMESPACE, none_is_leaf=False)  # type: ignore
         new_observations, rewards, dones, infos = env.step(actions)
+        new_observations = obs_as_tensor(new_observations, model.device)
         current_rewards += rewards.to(current_rewards)
         current_lengths += 1
         for i in range(n_envs):

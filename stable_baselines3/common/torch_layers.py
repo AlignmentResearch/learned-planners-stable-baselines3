@@ -1,9 +1,11 @@
+from collections import OrderedDict
 from typing import Dict, List, Tuple, Type, Union
 
 import gymnasium as gym
 import torch as th
 from gymnasium import spaces
 from torch import nn
+from transformer_lens.hook_points import HookPoint
 
 from stable_baselines3.common.preprocessing import get_flattened_obs_dim, is_image_space
 from stable_baselines3.common.type_aliases import TensorDict
@@ -182,8 +184,8 @@ class MlpExtractor(nn.Module):
     ) -> None:
         super().__init__()
         device = get_device(device)
-        policy_net: List[nn.Module] = []
-        value_net: List[nn.Module] = []
+        policy_net: OrderedDict[str, nn.Module] = OrderedDict()
+        value_net: OrderedDict[str, nn.Module] = OrderedDict()
         last_layer_dim_pi = feature_dim
         last_layer_dim_vf = feature_dim
 
@@ -195,14 +197,16 @@ class MlpExtractor(nn.Module):
         else:
             pi_layers_dims = vf_layers_dims = net_arch
         # Iterate through the policy layers and build the policy net
-        for curr_layer_dim in pi_layers_dims:
-            policy_net.append(nn.Linear(last_layer_dim_pi, curr_layer_dim))
-            policy_net.append(activation_fn())
+        for i, curr_layer_dim in enumerate(pi_layers_dims):
+            policy_net[f"fc{i}"] = nn.Linear(last_layer_dim_pi, curr_layer_dim)
+            policy_net[f"activation{i}"] = activation_fn()
+            policy_net[f"hook_fc{i}"] = HookPoint()
             last_layer_dim_pi = curr_layer_dim
         # Iterate through the value layers and build the value net
-        for curr_layer_dim in vf_layers_dims:
-            value_net.append(nn.Linear(last_layer_dim_vf, curr_layer_dim))
-            value_net.append(activation_fn())
+        for i, curr_layer_dim in enumerate(vf_layers_dims):
+            value_net[f"fc{i}"] = nn.Linear(last_layer_dim_vf, curr_layer_dim)
+            value_net[f"activation{i}"] = activation_fn()
+            value_net[f"hook_fc{i}"] = HookPoint()
             last_layer_dim_vf = curr_layer_dim
 
         # Save dim, used to create the distributions
@@ -211,8 +215,8 @@ class MlpExtractor(nn.Module):
 
         # Create networks
         # If the list of layers is empty, the network will just act as an Identity module
-        self.policy_net = nn.Sequential(*policy_net).to(device)
-        self.value_net = nn.Sequential(*value_net).to(device)
+        self.policy_net = nn.Sequential(policy_net).to(device)
+        self.value_net = nn.Sequential(value_net).to(device)
 
     def forward(self, features: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
         """

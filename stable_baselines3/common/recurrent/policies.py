@@ -30,7 +30,6 @@ from stable_baselines3.common.torch_layers import (
     NatureCNN,
 )
 from stable_baselines3.common.type_aliases import Schedule, TorchGymObs, non_null
-from transformer_lens.hook_points import HookPoint
 from mamba_lens import InputDependentHookedRootModule
 
 
@@ -695,9 +694,6 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
             optimizer_kwargs=optimizer_kwargs,
         )
 
-        self.hook_latent_pi = HookPoint()
-        self.hook_latent_vf = HookPoint()
-
         # setup hook points
         super().setup()
 
@@ -736,9 +732,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
         """
         latents, state = self._recurrent_extract_features(obs, state, episode_starts)
         latent_pi = self.mlp_extractor.forward_actor(latents)
-        latent_pi = self.hook_latent_pi(latent_pi)
         latent_vf = self.mlp_extractor.forward_critic(latents)
-        latent_vf = self.hook_latent_vf(latent_vf)
 
         # Evaluate the values for the given observations
         values = self.value_net(latent_vf)

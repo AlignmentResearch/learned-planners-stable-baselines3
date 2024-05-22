@@ -30,6 +30,8 @@ from stable_baselines3.common.torch_layers import (
     NatureCNN,
 )
 from stable_baselines3.common.type_aliases import Schedule, TorchGymObs, non_null
+from transformer_lens.hook_points import HookPoint
+from mamba_lens import InputDependentHookedRootModule
 
 
 class BaseRecurrentActorCriticPolicy(ActorCriticPolicy, Generic[RecurrentState]):
@@ -629,7 +631,11 @@ class RecurrentMultiInputActorCriticPolicy(RecurrentActorCriticPolicy):
         )
 
 
-class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy[RecurrentState], Generic[RecurrentState]):
+class RecurrentFeaturesExtractorActorCriticPolicy(
+    BaseRecurrentActorCriticPolicy[RecurrentState],
+    InputDependentHookedRootModule,
+    Generic[RecurrentState],
+):
     features_extractor: RecurrentFeaturesExtractor[TorchGymObs, RecurrentState]
 
     def __init__(
@@ -652,6 +658,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
         optimizer_kwargs: Optional[Dict[str, Any]] = None,
     ):
+        super(InputDependentHookedRootModule, self).__init__()
         if features_extractor_kwargs is None:
             features_extractor_kwargs = {}
         # Automatically deactivate dtype and bounds checks
@@ -688,6 +695,12 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
             optimizer_kwargs=optimizer_kwargs,
         )
 
+        self.hook_latent_pi = HookPoint()
+        self.hook_latent_vf = HookPoint()
+
+        # setup hook points
+        super().setup()
+
     def recurrent_initial_state(
         self, n_envs: Optional[int] = None, *, device: Optional[th.device | str] = None
     ) -> RecurrentState:
@@ -723,7 +736,9 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         """
         latents, state = self._recurrent_extract_features(obs, state, episode_starts)
         latent_pi = self.mlp_extractor.forward_actor(latents)
+        latent_pi = self.hook_latent_pi(latent_pi)
         latent_vf = self.mlp_extractor.forward_critic(latents)
+        latent_vf = self.hook_latent_vf(latent_vf)
 
         # Evaluate the values for the given observations
         values = self.value_net(latent_vf)

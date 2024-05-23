@@ -184,8 +184,8 @@ class MlpExtractor(nn.Module):
     ) -> None:
         super().__init__()
         device = get_device(device)
-        policy_net: OrderedDict[str, nn.Module] = OrderedDict()
-        value_net: OrderedDict[str, nn.Module] = OrderedDict()
+        policy_net: OrderedDict[str, nn.Module] = OrderedDict({"hook_pre_policy_net": HookPoint()})
+        value_net: OrderedDict[str, nn.Module] = OrderedDict({"hook_pre_value_net": HookPoint()})
         last_layer_dim_pi = feature_dim
         last_layer_dim_vf = feature_dim
 
@@ -199,14 +199,16 @@ class MlpExtractor(nn.Module):
         # Iterate through the policy layers and build the policy net
         for i, curr_layer_dim in enumerate(pi_layers_dims):
             policy_net[f"fc{i}"] = nn.Linear(last_layer_dim_pi, curr_layer_dim)
+            policy_net[f"hook_fc_pre_act{i}"] = HookPoint()
             policy_net[f"activation{i}"] = activation_fn()
-            policy_net[f"hook_fc{i}"] = HookPoint()
+            policy_net[f"hook_fc_post_act{i}"] = HookPoint()
             last_layer_dim_pi = curr_layer_dim
         # Iterate through the value layers and build the value net
         for i, curr_layer_dim in enumerate(vf_layers_dims):
             value_net[f"fc{i}"] = nn.Linear(last_layer_dim_vf, curr_layer_dim)
+            value_net[f"hook_fc_pre_act{i}"] = HookPoint()
             value_net[f"activation{i}"] = activation_fn()
-            value_net[f"hook_fc{i}"] = HookPoint()
+            value_net[f"hook_fc_post_act{i}"] = HookPoint()
             last_layer_dim_vf = curr_layer_dim
 
         # Save dim, used to create the distributions

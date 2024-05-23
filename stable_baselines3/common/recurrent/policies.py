@@ -4,6 +4,7 @@ from typing import Any, Dict, Generic, List, Optional, Tuple, Type, Union
 
 import torch as th
 from gymnasium import spaces
+from mamba_lens import InputDependentHookedRootModule
 from optree import tree_map
 from torch import nn
 
@@ -30,7 +31,6 @@ from stable_baselines3.common.torch_layers import (
     NatureCNN,
 )
 from stable_baselines3.common.type_aliases import Schedule, TorchGymObs, non_null
-from mamba_lens import InputDependentHookedRootModule
 
 
 class BaseRecurrentActorCriticPolicy(ActorCriticPolicy, Generic[RecurrentState]):
@@ -695,7 +695,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
         )
 
         # setup hook points
-        super().setup()
+        super(InputDependentHookedRootModule, self).setup()
 
     def recurrent_initial_state(
         self, n_envs: Optional[int] = None, *, device: Optional[th.device | str] = None

@@ -674,7 +674,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
                 new_features_extractor_kwargs["features_dim"] = features_extractor_kwargs["features_dim"]
             features_extractor_kwargs = new_features_extractor_kwargs
 
-        super().__init__(
+        super(BaseRecurrentActorCriticPolicy, self).__init__(
             observation_space=observation_space,
             action_space=action_space,
             lr_schedule=lr_schedule,

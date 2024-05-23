@@ -657,7 +657,6 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
         optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
         optimizer_kwargs: Optional[Dict[str, Any]] = None,
     ):
-        super(InputDependentHookedRootModule, self).__init__()
         if features_extractor_kwargs is None:
             features_extractor_kwargs = {}
         # Automatically deactivate dtype and bounds checks
@@ -693,6 +692,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
             optimizer_class=optimizer_class,
             optimizer_kwargs=optimizer_kwargs,
         )
+        super(InputDependentHookedRootModule, self).__init__()
 
         # setup hook points
         super(InputDependentHookedRootModule, self).setup()

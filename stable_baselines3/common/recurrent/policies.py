@@ -673,7 +673,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
                 new_features_extractor_kwargs["features_dim"] = features_extractor_kwargs["features_dim"]
             features_extractor_kwargs = new_features_extractor_kwargs
 
-        super(BaseRecurrentActorCriticPolicy, self).__init__(
+        super().__init__(
             observation_space=observation_space,
             action_space=action_space,
             lr_schedule=lr_schedule,
@@ -692,7 +692,6 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
             optimizer_class=optimizer_class,
             optimizer_kwargs=optimizer_kwargs,
         )
-        super(InputDependentHookedRootModule, self).__init__()
 
         # setup hook points
         super(InputDependentHookedRootModule, self).setup()

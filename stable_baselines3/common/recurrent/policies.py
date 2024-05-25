@@ -702,13 +702,17 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
         return self.features_extractor.recurrent_initial_state(n_envs, device=device)
 
     def _recurrent_extract_features(
-        self, obs: TorchGymObs, state: RecurrentState, episode_starts: th.Tensor
+        self,
+        obs: TorchGymObs,
+        state: RecurrentState,
+        episode_starts: th.Tensor,
+        return_repeats: bool = False,
     ) -> Tuple[th.Tensor, RecurrentState]:
         if not self.share_features_extractor:
             raise NotImplementedError("Non-shared features extractor not supported for recurrent extractors")
 
         preprocessed_obs = preprocess_obs(obs, self.observation_space, normalize_images=self.normalize_images)  # type: ignore
-        return self.features_extractor(preprocessed_obs, state, episode_starts)
+        return self.features_extractor(preprocessed_obs, state, episode_starts, return_repeats)
 
     def forward(  # type: ignore[override]
         self,
@@ -716,6 +720,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
         state: RecurrentState,
         episode_starts: th.Tensor,
         deterministic: bool = False,
+        return_repeats: bool = False,
     ) -> Tuple[th.Tensor, th.Tensor, th.Tensor, RecurrentState]:
         """Advances to the next hidden state, and computes all the outputs of a recurrent policy.
 
@@ -729,7 +734,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
         :returns: (actions, values, log_prob, state). The actions, values and log-action-probabilities for every time
             step T, and the final state.
         """
-        latents, state = self._recurrent_extract_features(obs, state, episode_starts)
+        latents, state = self._recurrent_extract_features(obs, state, episode_starts, return_repeats)
         latent_pi = self.mlp_extractor.forward_actor(latents)
         latent_vf = self.mlp_extractor.forward_critic(latents)
 

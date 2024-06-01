@@ -1,4 +1,5 @@
 import abc
+import inspect
 import math
 from typing import Any, Dict, Generic, List, Optional, Tuple, Type, Union
 
@@ -712,7 +713,11 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
             raise NotImplementedError("Non-shared features extractor not supported for recurrent extractors")
 
         preprocessed_obs = preprocess_obs(obs, self.observation_space, normalize_images=self.normalize_images)  # type: ignore
-        return self.features_extractor(preprocessed_obs, state, episode_starts, return_repeats)
+        # check if self.features_extractor takes return_repeats as an argument
+        if "return_repeats" in inspect.signature(self.features_extractor).parameters:
+            return self.features_extractor(preprocessed_obs, state, episode_starts, return_repeats=return_repeats)
+        else:
+            return self.features_extractor(preprocessed_obs, state, episode_starts)
 
     def forward(  # type: ignore[override]
         self,

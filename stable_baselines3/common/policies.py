@@ -10,6 +10,7 @@ import numpy as np
 import torch as th
 from gymnasium import spaces
 from torch import nn
+from transformer_lens.hook_points import HookPoint
 
 from stable_baselines3.common.distributions import (
     BernoulliDistribution,
@@ -36,7 +37,6 @@ from stable_baselines3.common.torch_layers import (
 from stable_baselines3.common.type_aliases import Schedule, TorchGymObs
 from stable_baselines3.common.utils import get_device, is_vectorized_observation
 from stable_baselines3.common.vec_env.util import obs_as_tensor
-from transformer_lens.hook_points import HookPoint
 
 SelfBaseModel = TypeVar("SelfBaseModel", bound="BaseModel")
 

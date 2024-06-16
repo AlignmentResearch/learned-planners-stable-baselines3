@@ -34,7 +34,12 @@ from stable_baselines3.common.torch_layers import (
 from stable_baselines3.common.type_aliases import Schedule, TorchGymObs, non_null
 
 
-class BaseRecurrentActorCriticPolicy(ActorCriticPolicy, Generic[RecurrentState]):
+class BaseRecurrentActorCriticPolicy(ActorCriticPolicy, InputDependentHookedRootModule, Generic[RecurrentState]):
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        # setup hook points
+        super(InputDependentHookedRootModule, self).setup()
+
     @abc.abstractmethod
     def recurrent_initial_state(
         self, n_envs: Optional[int] = None, *, device: Optional[th.device | str] = None
@@ -631,11 +636,7 @@ class RecurrentMultiInputActorCriticPolicy(RecurrentActorCriticPolicy):
         )
 
 
-class RecurrentFeaturesExtractorActorCriticPolicy(
-    BaseRecurrentActorCriticPolicy[RecurrentState],
-    InputDependentHookedRootModule,
-    Generic[RecurrentState],
-):
+class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy[RecurrentState], Generic[RecurrentState]):
     features_extractor: RecurrentFeaturesExtractor[TorchGymObs, RecurrentState]
 
     def __init__(
@@ -693,9 +694,6 @@ class RecurrentFeaturesExtractorActorCriticPolicy(
             optimizer_class=optimizer_class,
             optimizer_kwargs=optimizer_kwargs,
         )
-
-        # setup hook points
-        super(InputDependentHookedRootModule, self).setup()
 
     def recurrent_initial_state(
         self, n_envs: Optional[int] = None, *, device: Optional[th.device | str] = None

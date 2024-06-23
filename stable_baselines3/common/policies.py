@@ -10,6 +10,7 @@ import numpy as np
 import torch as th
 from gymnasium import spaces
 from torch import nn
+from transformer_lens.hook_points import HookPoint
 
 from stable_baselines3.common.distributions import (
     BernoulliDistribution,
@@ -513,6 +514,8 @@ class ActorCriticPolicy(BasePolicy):
         self.action_dist = make_proba_distribution(action_space, use_sde=use_sde, dist_kwargs=dist_kwargs)
         self.lr_schedule = lr_schedule
 
+        self.hook_action_net = HookPoint()
+
         self._build()
 
     def _get_constructor_parameters(self) -> Dict[str, Any]:
@@ -677,6 +680,7 @@ class ActorCriticPolicy(BasePolicy):
         :return: Action distribution
         """
         mean_actions = self.action_net(latent_pi)
+        mean_actions = self.hook_action_net(mean_actions)
 
         if isinstance(self.action_dist, DiagGaussianDistribution):
             return self.action_dist.proba_distribution(mean_actions, self.log_std)

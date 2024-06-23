@@ -1,9 +1,11 @@
 import abc
+import inspect
 import math
 from typing import Any, Dict, Generic, List, Optional, Tuple, Type, Union
 
 import torch as th
 from gymnasium import spaces
+from mamba_lens import InputDependentHookedRootModule
 from optree import tree_map
 from torch import nn
 
@@ -32,7 +34,12 @@ from stable_baselines3.common.torch_layers import (
 from stable_baselines3.common.type_aliases import Schedule, TorchGymObs, non_null
 
 
-class BaseRecurrentActorCriticPolicy(ActorCriticPolicy, Generic[RecurrentState]):
+class BaseRecurrentActorCriticPolicy(ActorCriticPolicy, InputDependentHookedRootModule, Generic[RecurrentState]):
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        # setup hook points
+        super(InputDependentHookedRootModule, self).setup()
+
     @abc.abstractmethod
     def recurrent_initial_state(
         self, n_envs: Optional[int] = None, *, device: Optional[th.device | str] = None
@@ -694,13 +701,21 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         return self.features_extractor.recurrent_initial_state(n_envs, device=device)
 
     def _recurrent_extract_features(
-        self, obs: TorchGymObs, state: RecurrentState, episode_starts: th.Tensor
+        self,
+        obs: TorchGymObs,
+        state: RecurrentState,
+        episode_starts: th.Tensor,
+        return_repeats: bool = False,
     ) -> Tuple[th.Tensor, RecurrentState]:
         if not self.share_features_extractor:
             raise NotImplementedError("Non-shared features extractor not supported for recurrent extractors")
 
         preprocessed_obs = preprocess_obs(obs, self.observation_space, normalize_images=self.normalize_images)  # type: ignore
-        return self.features_extractor(preprocessed_obs, state, episode_starts)
+        # check if self.features_extractor takes return_repeats as an argument
+        if "return_repeats" in inspect.signature(self.features_extractor).parameters:
+            return self.features_extractor(preprocessed_obs, state, episode_starts, return_repeats=return_repeats)
+        else:
+            return self.features_extractor(preprocessed_obs, state, episode_starts)
 
     def forward(  # type: ignore[override]
         self,
@@ -708,6 +723,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         state: RecurrentState,
         episode_starts: th.Tensor,
         deterministic: bool = False,
+        return_repeats: bool = False,
     ) -> Tuple[th.Tensor, th.Tensor, th.Tensor, RecurrentState]:
         """Advances to the next hidden state, and computes all the outputs of a recurrent policy.
 
@@ -721,7 +737,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         :returns: (actions, values, log_prob, state). The actions, values and log-action-probabilities for every time
             step T, and the final state.
         """
-        latents, state = self._recurrent_extract_features(obs, state, episode_starts)
+        latents, state = self._recurrent_extract_features(obs, state, episode_starts, return_repeats)
         latent_pi = self.mlp_extractor.forward_actor(latents)
         latent_vf = self.mlp_extractor.forward_critic(latents)
 

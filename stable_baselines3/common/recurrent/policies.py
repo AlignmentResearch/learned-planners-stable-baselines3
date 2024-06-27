@@ -712,7 +712,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
 
         preprocessed_obs = preprocess_obs(obs, self.observation_space, normalize_images=self.normalize_images)  # type: ignore
         # check if self.features_extractor takes return_repeats as an argument
-        if "return_repeats" in inspect.signature(self.features_extractor).parameters:
+        if "return_repeats" in inspect.signature(self.features_extractor.forward).parameters:
             return self.features_extractor(preprocessed_obs, state, episode_starts, return_repeats=return_repeats)
         else:
             return self.features_extractor(preprocessed_obs, state, episode_starts)

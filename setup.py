@@ -110,7 +110,7 @@ setup(
         # Plotting learning curves
         "matplotlib",
         # For hooks on recurrent policy
-        "mamba_lens @ git+https://github.com/Phylliida/MambaLens.git",
+        "mamba_lens @ git+https://github.com/taufeeque9/MambaLens.git",
     ],
     extras_require={
         "tests": [

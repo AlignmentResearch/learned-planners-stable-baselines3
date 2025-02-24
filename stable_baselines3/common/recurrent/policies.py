@@ -705,7 +705,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         obs: TorchGymObs,
         state: RecurrentState,
         episode_starts: th.Tensor,
-        return_repeats: bool = False,
+        feature_extractor_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Tuple[th.Tensor, RecurrentState]:
         if not self.share_features_extractor:
             raise NotImplementedError("Non-shared features extractor not supported for recurrent extractors")
@@ -713,9 +713,18 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         preprocessed_obs = preprocess_obs(obs, self.observation_space, normalize_images=self.normalize_images)  # type: ignore
         # check if self.features_extractor takes return_repeats as an argument
         if "return_repeats" in inspect.signature(self.features_extractor.forward).parameters:
-            return self.features_extractor(preprocessed_obs, state, episode_starts, return_repeats=return_repeats)
+            return self.features_extractor(
+                preprocessed_obs,
+                state,
+                episode_starts,
+                **(feature_extractor_kwargs or {}),
+            )
         else:
-            return self.features_extractor(preprocessed_obs, state, episode_starts)
+            return self.features_extractor(
+                preprocessed_obs,
+                state,
+                episode_starts,
+            )
 
     def forward(  # type: ignore[override]
         self,
@@ -723,7 +732,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         state: RecurrentState,
         episode_starts: th.Tensor,
         deterministic: bool = False,
-        return_repeats: bool = False,
+        feature_extractor_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Tuple[th.Tensor, th.Tensor, th.Tensor, RecurrentState]:
         """Advances to the next hidden state, and computes all the outputs of a recurrent policy.
 
@@ -737,7 +746,12 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         :returns: (actions, values, log_prob, state). The actions, values and log-action-probabilities for every time
             step T, and the final state.
         """
-        latents, state = self._recurrent_extract_features(obs, state, episode_starts, return_repeats)
+        latents, state = self._recurrent_extract_features(
+            obs,
+            state,
+            episode_starts,
+            feature_extractor_kwargs=feature_extractor_kwargs,
+        )
         latent_pi = self.mlp_extractor.forward_actor(latents)
         latent_vf = self.mlp_extractor.forward_critic(latents)
 
@@ -753,6 +767,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         obs: TorchGymObs,
         state: RecurrentState,
         episode_starts: th.Tensor,
+        feature_extractor_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Distribution, RecurrentState]:
         """
         Get the policy distribution for each step given the observations.
@@ -763,7 +778,12 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
             everywhere except for T=0, where it may be 1.
         :return: the action distribution, the new hidden states.
         """
-        latent_pi, state = self._recurrent_extract_features(obs, state, episode_starts)
+        latent_pi, state = self._recurrent_extract_features(
+            obs,
+            state,
+            episode_starts,
+            feature_extractor_kwargs=feature_extractor_kwargs,
+        )
         latent_pi = self.mlp_extractor.forward_actor(latent_pi)
         return self._get_action_dist_from_latent(latent_pi), state
 

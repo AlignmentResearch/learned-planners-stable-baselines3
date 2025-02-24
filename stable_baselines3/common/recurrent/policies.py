@@ -705,8 +705,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         obs: TorchGymObs,
         state: RecurrentState,
         episode_starts: th.Tensor,
-        return_repeats: bool = False,
-        use_interpretable_forward: bool = False,
+        feature_extractor_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Tuple[th.Tensor, RecurrentState]:
         if not self.share_features_extractor:
             raise NotImplementedError("Non-shared features extractor not supported for recurrent extractors")
@@ -718,8 +717,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
                 preprocessed_obs,
                 state,
                 episode_starts,
-                return_repeats=return_repeats,
-                use_interpretable_forward=use_interpretable_forward,
+                **(feature_extractor_kwargs or {}),
             )
         else:
             return self.features_extractor(
@@ -734,8 +732,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         state: RecurrentState,
         episode_starts: th.Tensor,
         deterministic: bool = False,
-        return_repeats: bool = False,
-        use_interpretable_forward: bool = False,
+        feature_extractor_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Tuple[th.Tensor, th.Tensor, th.Tensor, RecurrentState]:
         """Advances to the next hidden state, and computes all the outputs of a recurrent policy.
 
@@ -753,8 +750,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
             obs,
             state,
             episode_starts,
-            return_repeats,
-            use_interpretable_forward,
+            feature_extractor_kwargs=feature_extractor_kwargs,
         )
         latent_pi = self.mlp_extractor.forward_actor(latents)
         latent_vf = self.mlp_extractor.forward_critic(latents)
@@ -771,8 +767,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
         obs: TorchGymObs,
         state: RecurrentState,
         episode_starts: th.Tensor,
-        return_repeats: bool = False,
-        use_interpretable_forward: bool = False,
+        feature_extractor_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Distribution, RecurrentState]:
         """
         Get the policy distribution for each step given the observations.
@@ -787,8 +782,7 @@ class RecurrentFeaturesExtractorActorCriticPolicy(BaseRecurrentActorCriticPolicy
             obs,
             state,
             episode_starts,
-            return_repeats,
-            use_interpretable_forward,
+            feature_extractor_kwargs=feature_extractor_kwargs,
         )
         latent_pi = self.mlp_extractor.forward_actor(latent_pi)
         return self._get_action_dist_from_latent(latent_pi), state

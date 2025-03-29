@@ -38,6 +38,8 @@ from stable_baselines3.common.type_aliases import Schedule, TorchGymObs
 from stable_baselines3.common.utils import get_device, is_vectorized_observation
 from stable_baselines3.common.vec_env.util import obs_as_tensor
 
+from transformer_lens.hook_points import HookedRootModule
+
 SelfBaseModel = TypeVar("SelfBaseModel", bound="BaseModel")
 
 
@@ -394,7 +396,7 @@ class BasePolicy(BaseModel, ABC):
         return low + (0.5 * (scaled_action + 1.0) * (high - low))
 
 
-class ActorCriticPolicy(BasePolicy):
+class ActorCriticPolicy(BasePolicy, HookedRootModule):
     """
     Policy class for actor-critic algorithms (has both policy and value prediction).
     Used by A2C, PPO and the likes.
@@ -517,6 +519,10 @@ class ActorCriticPolicy(BasePolicy):
         self.hook_action_net = HookPoint()
 
         self._build()
+
+        # setup hook points
+        # super(HookedRootModule, self).setup()
+        self.setup()
 
     def _get_constructor_parameters(self) -> Dict[str, Any]:
         data = super()._get_constructor_parameters()

@@ -518,8 +518,7 @@ class ActorCriticPolicy(BasePolicy, HookedRootModule):
 
         self._build()
 
-        # setup hook points
-        # super(HookedRootModule, self).setup()
+        # setup hook points for transformer lens
         self.setup()
 
     def _get_constructor_parameters(self) -> Dict[str, Any]:

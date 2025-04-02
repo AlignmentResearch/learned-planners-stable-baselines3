@@ -10,7 +10,7 @@ import numpy as np
 import torch as th
 from gymnasium import spaces
 from torch import nn
-from transformer_lens.hook_points import HookPoint
+from transformer_lens.hook_points import HookedRootModule, HookPoint
 
 from stable_baselines3.common.distributions import (
     BernoulliDistribution,
@@ -394,7 +394,7 @@ class BasePolicy(BaseModel, ABC):
         return low + (0.5 * (scaled_action + 1.0) * (high - low))
 
 
-class ActorCriticPolicy(BasePolicy):
+class ActorCriticPolicy(BasePolicy, HookedRootModule):
     """
     Policy class for actor-critic algorithms (has both policy and value prediction).
     Used by A2C, PPO and the likes.
@@ -517,6 +517,9 @@ class ActorCriticPolicy(BasePolicy):
         self.hook_action_net = HookPoint()
 
         self._build()
+
+        # setup hook points for transformer lens
+        self.setup()
 
     def _get_constructor_parameters(self) -> Dict[str, Any]:
         data = super()._get_constructor_parameters()
